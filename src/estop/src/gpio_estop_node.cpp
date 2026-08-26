@@ -120,7 +120,7 @@ private:
 
     // estop_active_ true -> trip relay -> pin LOW.
     // estop_active_ false -> motors enabled -> pin HIGH.
-    const int gpio_value = estop_active_ ? 0 : 1;
+    const int gpio_value = estop_active_ ? 1 : 0;
     const int set_result = gpiod_line_set_value(line_, gpio_value);
     if (set_result < 0) {
       RCLCPP_ERROR(this->get_logger(), "Failed to set GPIO line %d", line_offset_);
