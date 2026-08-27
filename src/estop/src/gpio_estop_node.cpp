@@ -45,7 +45,7 @@ public:
   : Node("gpio_estop_node"), chip_(nullptr), line_(nullptr), estop_active_(false)
   {
     chip_name_ = this->declare_parameter<std::string>("gpio_chip", "gpiochip0");
-    line_offset_ = this->declare_parameter<int>("gpio_line_offset", 17);
+    line_offset_ = this->declare_parameter<int>("gpio_line_offset", 23);
 
     // --- Open the GPIO chip and request the line as an output ---
     chip_ = gpiod_chip_open_by_name(chip_name_.c_str());
@@ -120,8 +120,8 @@ private:
 
     // estop_active_ true -> trip relay -> pin LOW.
     // estop_active_ false -> motors enabled -> pin HIGH.
-    const int gpio_value = estop_active_ ? 1 : 0;
-    const int set_result = gpiod_line_set_value(line_, gpio_value);
+    // const int gpio_value = estop_active_ ? 0 : 1;
+    const int set_result = gpiod_line_set_value(line_, estop_active_);
     if (set_result < 0) {
       RCLCPP_ERROR(this->get_logger(), "Failed to set GPIO line %d", line_offset_);
     }
