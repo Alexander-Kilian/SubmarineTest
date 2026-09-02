@@ -119,7 +119,7 @@ private:
 
     const uint16_t value = channels[threshold_channel_index_];
     bool triggered = false;
-    if(value <= 1100 || value >= 800){
+    if(value <= 1100 && value >= 900){
       triggered = true;
     }
     else{
