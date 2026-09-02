@@ -42,7 +42,7 @@ public:
     // Default here = 4, i.e. "channel 5" as counted on the transmitter.
     // Verify with crsf_test.py that index 4 is really the channel that
     // moves when you flip your toggle — adjust via the ROS parameter if not.
-    threshold_channel_index_ = this->declare_parameter<int>("threshold_channel_index", 4);
+    threshold_channel_index_ = this->declare_parameter<int>("threshold_channel_index", 7);
     threshold_value_ = this->declare_parameter<int>("threshold_value", 1500);
     threshold_above_triggers_ = this->declare_parameter<bool>("threshold_above_triggers", true);
 
@@ -118,9 +118,17 @@ private:
     }
 
     const uint16_t value = channels[threshold_channel_index_];
-    const bool triggered = threshold_above_triggers_
-      ? (value > threshold_value_)
-      : (value < threshold_value_);
+    bool triggered = false;
+    if(value <= 1100 || value >= 800){
+      triggered = true;
+    }
+    else(){
+      triggered = false;
+    }
+
+    // const bool triggered = threshold_above_triggers_
+    //   ? (value > threshol_value_)
+    //   : (value < threshold_value_);
 
     std_msgs::msg::Bool bool_msg;
     bool_msg.data = triggered;
