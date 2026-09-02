@@ -122,7 +122,7 @@ private:
     if(value <= 1100 || value >= 800){
       triggered = true;
     }
-    else(){
+    else{
       triggered = false;
     }
 
