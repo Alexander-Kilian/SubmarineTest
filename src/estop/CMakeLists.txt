@@ -16,6 +16,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(mavros_msgs REQUIRED)
 
 # xcrsf is installed system-wide via its own `sudo make install`
 # (not a ROS package / not colcon-built), so we locate it manually.
@@ -36,9 +37,13 @@ target_include_directories(gpio_estop_node PRIVATE ${GPIOD_INCLUDE_DIR})
 ament_target_dependencies(gpio_estop_node rclcpp std_msgs)
 target_link_libraries(gpio_estop_node ${GPIOD_LIBRARY})
 
+add_executable(manual_control_node src/manual_control_node.cpp)
+ament_target_dependencies(manual_control_node rclcpp std_msgs mavros_msgs)
+
 install(TARGETS
   crsf_channel_node
   gpio_estop_node
+  manual_control_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
