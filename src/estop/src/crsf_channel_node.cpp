@@ -40,8 +40,6 @@
 #include <memory>
 #include <string>
 
-#include <termios.h>  // speed_t
-
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/u_int16_multi_array.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -60,10 +58,10 @@ public:
     serial_port_ = this->declare_parameter<std::string>("serial_port", "/dev/ttyAMA0");
     poll_rate_hz_ = this->declare_parameter<double>("poll_rate_hz", 50.0);
 
-    // CRSF UART baud rate. Standard CRSF is 420000; xcrsf defaults to that.
-    // Set this to match the ELRS receiver if its CRSF baud was changed (e.g.
-    // 400000, 921600). If it doesn't match, frames never decode and
-    // is_paired() stays false.
+    // CRSF UART baud rate. Passed to XCrossfire (whose own default is 420000,
+    // the CRSF standard). This default matches the rate currently configured
+    // on the ELRS receiver - keep the two in sync, or frames never decode and
+    // is_paired() stays false. xcrsf sets non-standard rates via termios2.
     crsf_baud_ = this->declare_parameter<int>("crsf_baud", 115200);
 
     // Enable channel: the 3-position switch. 0-based index into the 16-channel
