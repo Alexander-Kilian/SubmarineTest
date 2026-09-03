@@ -40,6 +40,8 @@
 #include <memory>
 #include <string>
 
+#include <termios.h>  // speed_t
+
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/u_int16_multi_array.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -57,6 +59,12 @@ public:
     // --- Parameters (set via a launch file or `ros2 run ... --ros-args -p`) ---
     serial_port_ = this->declare_parameter<std::string>("serial_port", "/dev/ttyAMA0");
     poll_rate_hz_ = this->declare_parameter<double>("poll_rate_hz", 50.0);
+
+    // CRSF UART baud rate. Standard CRSF is 420000; xcrsf defaults to that.
+    // Set this to match the ELRS receiver if its CRSF baud was changed (e.g.
+    // 400000, 921600). If it doesn't match, frames never decode and
+    // is_paired() stays false.
+    crsf_baud_ = this->declare_parameter<int>("crsf_baud", 115200);
 
     // Enable channel: the 3-position switch. 0-based index into the 16-channel
     // CRSF array. Default 7 (i.e. "channel 8" as counted on the transmitter).
@@ -80,16 +88,19 @@ public:
     threshold_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/channel_threshold", 10);
 
     // --- Open the CRSF serial link ---
-    crossfire_ = std::make_unique<crossfire::XCrossfire>(serial_port_.c_str());
+    crossfire_ = std::make_unique<crossfire::XCrossfire>(
+      serial_port_, static_cast<speed_t>(crsf_baud_));
     port_open_ = crossfire_->open_port();
     if (port_open_) {
-      RCLCPP_INFO(this->get_logger(), "Opened CRSF port '%s'.", serial_port_.c_str());
+      RCLCPP_INFO(
+        this->get_logger(), "Opened CRSF port '%s' at %d baud.",
+        serial_port_.c_str(), crsf_baud_);
     } else {
       RCLCPP_ERROR(
         this->get_logger(),
-        "Failed to open CRSF port '%s' - retrying every poll cycle. "
+        "Failed to open CRSF port '%s' at %d baud - retrying every poll cycle. "
         "Publishing crsf/channel_threshold=false until it recovers.",
-        serial_port_.c_str());
+        serial_port_.c_str(), crsf_baud_);
     }
 
     RCLCPP_WARN(
@@ -220,6 +231,7 @@ private:
   std::unique_ptr<crossfire::XCrossfire> crossfire_;
   bool port_open_;
   std::string serial_port_;
+  int crsf_baud_;
   double poll_rate_hz_;
 
   // --- Enable-switch config ---
