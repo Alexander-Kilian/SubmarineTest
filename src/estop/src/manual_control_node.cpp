@@ -32,8 +32,9 @@
 //      relay state - the node will not command through a cut motor circuit.
 //   3. /mavros/state.connected == true and fresh. MAVROS <-> ArduSub link live.
 //
-// When the gate holds (answers to the planning questions: auto-arm + set mode):
-//   - if the flight mode is not `target_mode` (default STABILIZE), request it;
+// When the gate holds (auto-arm + set mode):
+//   - if the flight mode is not `target_mode` (default MANUAL; set
+//     target_mode:=STABILIZE for attitude-stabilised driving), request it;
 //   - once in mode, if the gate has held continuously for arm_hold_s AND the RC
 //     is fresh AND both sticks are within arm_stick_epsilon of centre, arm;
 //   - once armed and in mode, stream MANUAL_CONTROL at send_rate_hz. If the RC
@@ -53,8 +54,8 @@
 //   - ArduSub: MANUAL_CONTROL acts only when armed and in MANUAL/STABILIZE/
 //     DEPTH_HOLD; x/y/r in [-1000,1000], z in [0,1000] (500 neutral). MAVROS
 //     forwards these values unscaled.
-//   - ArduSub accepts a mode change to STABILIZE while disarmed and can arm in
-//     STABILIZE on the surface with the current ARMING_CHECK set.
+//   - ArduSub accepts a mode change to `target_mode` while disarmed and can arm
+//     in that mode on the surface with the current ARMING_CHECK set.
 //   - /mavros/cmd/arming and /mavros/set_mode may report success but not take
 //     effect; this node verifies against /mavros/state, never the service ACK
 //     alone.
@@ -155,7 +156,10 @@ public:
     disarm_retry_hz_ = this->declare_parameter<double>("disarm_retry_hz", 5.0);
     mode_arm_retry_s_ = this->declare_parameter<double>("mode_arm_retry_s", 1.0);
     arm_stick_epsilon_ = this->declare_parameter<double>("arm_stick_epsilon", 60.0);
-    target_mode_ = this->declare_parameter<std::string>("target_mode", "STABILIZE");
+    // ArduSub flight mode the node commands when the gate holds. Default MANUAL
+    // (raw passthrough, no attitude stabilisation). Set target_mode:=STABILIZE
+    // for auto-levelled roll/pitch with manual throttle and yaw.
+    target_mode_ = this->declare_parameter<std::string>("target_mode", "MANUAL");
 
     // --- ROS time init (so freshness checks start "stale") ---
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
@@ -503,7 +507,7 @@ private:
   double disarm_retry_hz_ {5.0};
   double mode_arm_retry_s_ {1.0};
   double arm_stick_epsilon_ {60.0};
-  std::string target_mode_ {"STABILIZE"};
+  std::string target_mode_ {"MANUAL"};
 
   // ---- Cached inputs ----
   std::vector<uint16_t> last_channels_;
