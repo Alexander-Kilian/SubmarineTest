@@ -130,7 +130,7 @@ public:
     fwd_cal_.raw_min = this->declare_parameter<double>("fwd_raw_min", 191.0);
     fwd_cal_.raw_center = this->declare_parameter<double>("fwd_raw_center", 997.0);
     fwd_cal_.raw_max = this->declare_parameter<double>("fwd_raw_max", 1792.0);
-    fwd_cal_.deadband = this->declare_parameter<double>("fwd_deadband", 40.0);
+    fwd_cal_.deadband = this->declare_parameter<double>("fwd_deadband", 150.0);
     fwd_cal_.invert = this->declare_parameter<bool>("fwd_invert", false);
 
     yaw_cal_.index = this->declare_parameter<int>("yaw_channel_index", 3);

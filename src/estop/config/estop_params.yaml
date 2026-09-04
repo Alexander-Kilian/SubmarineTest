@@ -1,0 +1,68 @@
+# Shared parameters for the estop package bringup.
+#
+# One file, one key per node (keyed by node name, no namespace). Edit the
+# calibration values here as they are measured on the bench, then just
+# `git pull` on the Pi - no rebuild needed for a params-only change.
+
+crsf_channel_node:
+  ros__parameters:
+    serial_port: /dev/ttyAMA0
+    poll_rate_hz: 50.0
+    # Must match the ELRS receiver's configured CRSF baud (standard is 420000).
+    crsf_baud: 115200
+    # 0-based index of the 3-position enable switch in the 16-channel array.
+    enable_channel_index: 7
+    # Neutral centre band, raw CRSF counts. Switch detents observed at
+    # ~191 / ~997 / ~1792, so [700, 1300] keeps ~500 counts of margin.
+    neutral_low: 700
+    neutral_high: 1300
+    # Declared but not yet enforced (see link_healthy() TODO).
+    min_link_quality: 50
+
+gpio_estop_node:
+  ros__parameters:
+    gpio_chip: gpiochip0
+    # BCM23 / 40-pin header physical pin 16.
+    gpio_line_offset: 23
+    # Force the relay pin LOW if no crsf/channel_threshold message for this long.
+    watchdog_timeout_ms: 500
+    status_heartbeat_hz: 2.0
+    watchdog_check_hz: 20.0
+
+manual_control_node:
+  ros__parameters:
+    # --- channel selection ---
+    fwd_channel_index: 2          # CRSF index 2 -> MANUAL_CONTROL x (fwd/rev)
+    yaw_channel_index: 3          # CRSF index 3 -> MANUAL_CONTROL r (yaw)
+
+    # --- per-axis calibration (raw CRSF counts) ---
+    fwd_raw_min: 191.0
+    fwd_raw_center: 997.0
+    fwd_raw_max: 1792.0
+    fwd_deadband: 40.0           # in MANUAL_CONTROL counts (+/-1000 domain)
+    fwd_invert: false            # index 2 high = forward
+
+    yaw_raw_min: 191.0
+    yaw_raw_center: 997.0
+    yaw_raw_max: 1792.0
+    yaw_deadband: 40.0
+    yaw_invert: false            # index 3 high = yaw right
+
+    # --- command shaping ---
+    z_neutral: 500.0             # ArduSub vertical axis neutral ([0,1000])
+    send_rate_hz: 20.0
+    slew_max_per_s: 0.0          # 0 = disabled; counts/s ramp limit on x and r
+
+    # --- gate timeouts / pacing (seconds unless noted) ---
+    enable_timeout_s: 0.4
+    estop_timeout_s: 1.5
+    axes_timeout_s: 0.4
+    mavros_timeout_s: 3.0
+    arm_hold_s: 0.75
+    disarm_retry_hz: 5.0
+    mode_arm_retry_s: 1.0
+    arm_stick_epsilon: 60.0      # sticks must be within this of centre to arm
+
+    # ArduSub flight mode the node commands. MANUAL = raw passthrough.
+    # Requires MAV_GCS_SYSID on the vehicle to equal MAVROS's system_id.
+    target_mode: MANUAL

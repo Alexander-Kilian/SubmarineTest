@@ -17,27 +17,46 @@
 //
 // crsf/channel_threshold is the safety-relevant output. It is true ONLY when
 // BOTH of these hold:
-//   1. the receiver link is healthy, and
+//   1. the link state machine is OK, and
 //   2. the enable channel (the 3-position switch, channel index
 //      `enable_channel_index`) is inside the neutral centre band.
 //
-// It is published on EVERY poll cycle. Every failure mode - serial port not
-// open, receiver not paired, link quality below floor, channel index
-// misconfigured, or switch out of band - publishes `false` that same cycle.
-// The node never goes silent while running, so a downstream consumer that
-// stops seeing messages can treat that as "this node died" (see the watchdog
-// in gpio_estop_node and the enable-timeout in manual_control_node).
+// LINK LOSS / RECONNECT (trip fast, recover slow):
+//   - Any loss of link -> crsf/channel_threshold goes false immediately.
+//   - xcrsf does not self-heal after a serial dropout (is_paired() stays
+//     false), so on a sustained loss the node destroys and recreates the
+//     XCrossfire object and re-opens the port, ~1 Hz, until the link returns.
+//   - LinkFsm::LOST_TRANSIENT: link is back is not enough - it must be healthy
+//     continuously for RECOVER_HOLD_S before the permit is restored. This
+//     debounces a flapping link.
+//   - LinkFsm::LATCHED: if the link stays down longer than LATCH_TIMEOUT_S the
+//     permit is latched off. Clearing it requires the operator to move the
+//     enable switch to an extreme (e-stop) detent and back to centre, with a
+//     live link - a deliberate acknowledgement. (A crash+respawn loses this
+//     latch; that edge case is accepted and handled by the operator.)
+//
+// Moving the switch out of the centre band by hand is the normal manual
+// e-stop: instant false, instant clear, NO latch. Only link loss latches.
+//
+// crsf/channel_threshold is published on EVERY poll cycle - the node never
+// goes silent while running, so a downstream consumer that stops seeing
+// messages can treat that as "this node died" (see the watchdog in
+// gpio_estop_node and the enable-timeout in manual_control_node).
 //
 // A separate node (gpio_estop_node) subscribes to crsf/channel_threshold and
 // drives the relay GPIO. "Decode CRSF" and "touch hardware GPIO" stay as two
-// independent, individually testable nodes.
+// independent, individually testable nodes. The link FSM / latch policy will
+// move to a dedicated health-monitor node in a later refactor.
 //
 // Verified against the real installed header (/usr/local/include/xcrsf/crossfire.h):
-//   open_port(), is_paired(), get_channel_state() -> std::array<uint16_t, 16>, get_link_state().
+//   XCrossfire(uart_path, speed_t baud=420000), open_port(), close_port(),
+//   is_paired(), get_channel_state() -> std::array<uint16_t, 16>, get_link_state().
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
@@ -47,6 +66,15 @@
 #include "xcrsf/crossfire.h"
 
 using namespace std::chrono_literals;
+
+namespace
+{
+// Link-loss / reconnect timing. Hardcoded on purpose - tune here and rebuild.
+constexpr double RECONNECT_GRACE_S = 0.5;   // link bad this long before the first object-recreate
+constexpr double RECONNECT_PERIOD_S = 1.0;  // between recreate attempts
+constexpr double RECOVER_HOLD_S = 1.0;      // link healthy continuously before the permit is restored
+constexpr double LATCH_TIMEOUT_S = 5.0;     // link bad continuously -> LATCHED (operator switch toggle to clear)
+}  // namespace
 
 class CrsfChannelNode : public rclcpp::Node
 {
@@ -80,6 +108,11 @@ public:
     // Link-quality floor (0-100). NOTE: not yet enforced - see link_healthy().
     min_link_quality_ = this->declare_parameter<int>("min_link_quality", 50);
 
+    // --- ROS time init (so age checks are well-defined on the first poll) ---
+    const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
+    last_reconnect_attempt_ = t0;
+    link_lost_at_ = t0;
+
     // --- Publishers ---
     channels_pub_ = this->create_publisher<std_msgs::msg::UInt16MultiArray>("crsf/channels", 10);
     link_ok_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/link_ok", 10);
@@ -96,9 +129,9 @@ public:
     } else {
       RCLCPP_ERROR(
         this->get_logger(),
-        "Failed to open CRSF port '%s' at %d baud - retrying every poll cycle. "
+        "Failed to open CRSF port '%s' at %d baud - will recreate and retry ~%.1f Hz. "
         "Publishing crsf/channel_threshold=false until it recovers.",
-        serial_port_.c_str(), crsf_baud_);
+        serial_port_.c_str(), crsf_baud_, 1.0 / RECONNECT_PERIOD_S);
     }
 
     RCLCPP_WARN(
@@ -110,8 +143,9 @@ public:
 
     RCLCPP_INFO(
       this->get_logger(),
-      "Enable switch = channel index %d; neutral band = [%d, %d] counts; poll = %.1f Hz.",
-      enable_channel_index_, neutral_low_, neutral_high_, poll_rate_hz_);
+      "Enable switch = channel index %d; neutral band = [%d, %d] counts; poll = %.1f Hz. "
+      "Link loss latches after %.0f s; clear by toggling the switch to an extreme and back.",
+      enable_channel_index_, neutral_low_, neutral_high_, poll_rate_hz_, LATCH_TIMEOUT_S);
 
     // --- Poll timer ---
     const auto period = std::chrono::duration<double>(1.0 / poll_rate_hz_);
@@ -121,52 +155,175 @@ public:
   }
 
 private:
+  enum class LinkFsm { OK, LOST_TRANSIENT, LATCHED };
+  enum class SwitchZone { UNKNOWN, CENTER, EXTREME };
+
+  static const char * fsm_name(LinkFsm s)
+  {
+    switch (s) {
+      case LinkFsm::OK: return "OK";
+      case LinkFsm::LOST_TRANSIENT: return "LOST_TRANSIENT";
+      case LinkFsm::LATCHED: return "LATCHED";
+    }
+    return "?";
+  }
+  static const char * zone_name(SwitchZone z)
+  {
+    switch (z) {
+      case SwitchZone::UNKNOWN: return "unknown";
+      case SwitchZone::CENTER: return "centre";
+      case SwitchZone::EXTREME: return "extreme";
+    }
+    return "?";
+  }
+
   void poll_callback()
   {
-    // 1. Ensure the serial port is open.
-    if (!port_open_) {
-      port_open_ = crossfire_->open_port();
-      if (!port_open_) {
-        publish_link_ok(false);
-        publish_threshold(false);
-        return;
-      }
-      RCLCPP_INFO(this->get_logger(), "CRSF port '%s' recovered.", serial_port_.c_str());
-    }
+    const rclcpp::Time now = this->now();
 
-    // 2. Check the receiver link.
-    const bool link = link_healthy();
-    publish_link_ok(link);
+    // 1. Evaluate the link, recreating the xcrsf object on a sustained loss.
+    bool link = port_open_ && link_healthy();
     if (!link) {
-      // No valid link this cycle: fail safe, do not publish stale channel data.
-      publish_threshold(false);
-      return;
+      if (!link_bad_since_) {
+        link_bad_since_ = now;
+      }
+      const double bad_for = (now - *link_bad_since_).seconds();
+      const double since_attempt = (now - last_reconnect_attempt_).seconds();
+      if (bad_for >= RECONNECT_GRACE_S && since_attempt >= RECONNECT_PERIOD_S) {
+        attempt_reconnect(now);
+        link = port_open_ && link_healthy();
+      }
+    } else {
+      link_bad_since_.reset();
+    }
+    publish_link_ok(link);
+
+    // 2. Read the switch position (only meaningful with a live link).
+    SwitchZone zone = SwitchZone::UNKNOWN;
+    if (link) {
+      const std::array<uint16_t, 16> channels = crossfire_->get_channel_state();
+      std_msgs::msg::UInt16MultiArray channels_msg;
+      channels_msg.data.assign(channels.begin(), channels.end());
+      channels_pub_->publish(channels_msg);
+
+      if (enable_channel_index_ < 0 ||
+        static_cast<size_t>(enable_channel_index_) >= channels.size())
+      {
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 5000,
+          "enable_channel_index %d is out of range [0, %zu); treating the switch as "
+          "not centred. Set the parameter to your switch channel.",
+          enable_channel_index_, channels.size());
+      } else {
+        const uint16_t value = channels[enable_channel_index_];
+        zone = (value >= static_cast<uint16_t>(neutral_low_) &&
+                value <= static_cast<uint16_t>(neutral_high_))
+          ? SwitchZone::CENTER
+          : SwitchZone::EXTREME;
+      }
     }
 
-    // 3. Publish the raw channels.
-    const std::array<uint16_t, 16> channels = crossfire_->get_channel_state();
-    std_msgs::msg::UInt16MultiArray channels_msg;
-    channels_msg.data.assign(channels.begin(), channels.end());
-    channels_pub_->publish(channels_msg);
+    // 3. Run the link state machine and publish the permit.
+    update_link_fsm(now, link, zone);
+    const bool permitted = (link_fsm_ == LinkFsm::OK) && (zone == SwitchZone::CENTER);
+    publish_threshold(permitted, zone);
+  }
 
-    // 4. Derive "manual control permitted" from the enable switch.
-    if (enable_channel_index_ < 0 ||
-      static_cast<size_t>(enable_channel_index_) >= channels.size())
-    {
-      RCLCPP_WARN_THROTTLE(
-        this->get_logger(), *this->get_clock(), 5000,
-        "enable_channel_index %d is out of range [0, %zu); publishing "
-        "crsf/channel_threshold=false. Set the parameter to your switch channel.",
-        enable_channel_index_, channels.size());
-      publish_threshold(false);
-      return;
+  void update_link_fsm(const rclcpp::Time & now, bool link, SwitchZone zone)
+  {
+    // Continuous-healthy streak, for the "recover slow" debounce.
+    if (link) {
+      if (!link_good_since_) {
+        link_good_since_ = now;
+      }
+    } else {
+      link_good_since_.reset();
+    }
+    const bool link_stable = link_good_since_ &&
+      (now - *link_good_since_).seconds() >= RECOVER_HOLD_S;
+
+    const LinkFsm prev = link_fsm_;
+
+    switch (link_fsm_) {
+      case LinkFsm::OK:
+        if (!link) {
+          link_lost_at_ = now;
+          ack_extreme_seen_ = false;
+          link_fsm_ = LinkFsm::LOST_TRANSIENT;
+        }
+        break;
+
+      case LinkFsm::LOST_TRANSIENT:
+        if (link_stable) {
+          link_fsm_ = LinkFsm::OK;
+        } else if ((now - link_lost_at_).seconds() >= LATCH_TIMEOUT_S) {
+          link_fsm_ = LinkFsm::LATCHED;
+        }
+        break;
+
+      case LinkFsm::LATCHED:
+        // Operator acknowledgement: switch to an extreme detent, then back to
+        // centre, with a live and stable link.
+        if (link && zone == SwitchZone::EXTREME) {
+          ack_extreme_seen_ = true;
+        }
+        if (link_stable && ack_extreme_seen_ && zone == SwitchZone::CENTER) {
+          link_fsm_ = LinkFsm::OK;
+        }
+        break;
     }
 
-    const uint16_t value = channels[enable_channel_index_];
-    const bool permitted =
-      (value >= static_cast<uint16_t>(neutral_low_) &&
-       value <= static_cast<uint16_t>(neutral_high_));
-    publish_threshold(permitted);
+    if (link_fsm_ != prev) {
+      switch (link_fsm_) {
+        case LinkFsm::OK:
+          RCLCPP_INFO(
+            this->get_logger(), "Link FSM: %s -> OK (link stable %.1f s). Permit restored.",
+            fsm_name(prev), RECOVER_HOLD_S);
+          break;
+        case LinkFsm::LOST_TRANSIENT:
+          RCLCPP_WARN(
+            this->get_logger(),
+            "Link FSM: OK -> LOST_TRANSIENT. E-stop asserted; recreating the CRSF link. "
+            "Auto-recovers if healthy again within %.0f s, otherwise latches.",
+            LATCH_TIMEOUT_S);
+          break;
+        case LinkFsm::LATCHED:
+          RCLCPP_ERROR(
+            this->get_logger(),
+            "Link FSM: LOST_TRANSIENT -> LATCHED (link down > %.0f s). E-stop held. "
+            "Toggle the enable switch to an extreme detent and back to centre to re-enable.",
+            LATCH_TIMEOUT_S);
+          break;
+      }
+    }
+  }
+
+  void attempt_reconnect(const rclcpp::Time & now)
+  {
+    last_reconnect_attempt_ = now;
+    ++reconnect_count_;
+    RCLCPP_WARN(
+      this->get_logger(),
+      "Recreating XCrossfire on '%s' @ %d baud (reconnect attempt %lu).",
+      serial_port_.c_str(), crsf_baud_, reconnect_count_);
+
+    // Assumption (bench-verify): close_port() is safe to call here and
+    // ~XCrossfire() releases the fd and stops any internal reader thread, so a
+    // freshly constructed object + open_port() fully re-initialises the library.
+    if (crossfire_) {
+      (void)crossfire_->close_port();
+    }
+    crossfire_.reset();
+    crossfire_ = std::make_unique<crossfire::XCrossfire>(
+      serial_port_, static_cast<speed_t>(crsf_baud_));
+    port_open_ = crossfire_->open_port();
+
+    if (port_open_) {
+      RCLCPP_INFO(this->get_logger(), "CRSF port reopened; waiting for the receiver link.");
+    } else {
+      RCLCPP_WARN(
+        this->get_logger(), "CRSF port reopen failed; retrying in ~%.1f s.", RECONNECT_PERIOD_S);
+    }
   }
 
   // Returns true when the receiver link is considered healthy.
@@ -177,8 +334,6 @@ private:
   // the ELRS receiver is configured to HOLD the last channel values (or output
   // configured failsafe positions) on TX loss instead of stopping frames - in
   // that case is_paired() can stay true even though the transmitter is gone.
-  // The link-statistics frame that carries this quality figure still reaches
-  // the Pi over the one-way wiring described in the file header.
   bool link_healthy()
   {
     return crossfire_->is_paired();
@@ -201,7 +356,7 @@ private:
     }
   }
 
-  void publish_threshold(bool permitted)
+  void publish_threshold(bool permitted, SwitchZone zone)
   {
     std_msgs::msg::Bool msg;
     msg.data = permitted;
@@ -213,14 +368,14 @@ private:
       if (permitted) {
         RCLCPP_INFO(
           this->get_logger(),
-          "Manual control PERMITTED: link healthy and enable switch (channel index %d) "
-          "inside neutral band [%d, %d].",
+          "Manual control PERMITTED: link FSM OK and enable switch (index %d) in "
+          "neutral band [%d, %d].",
           enable_channel_index_, neutral_low_, neutral_high_);
       } else {
         RCLCPP_WARN(
           this->get_logger(),
-          "Manual control NOT permitted: enable switch out of band, link down, "
-          "channel index misconfigured, or serial port closed.");
+          "Manual control NOT permitted: link FSM = %s, switch = %s.",
+          fsm_name(link_fsm_), zone_name(zone));
       }
     }
   }
@@ -237,6 +392,18 @@ private:
   int neutral_low_;
   int neutral_high_;
   int min_link_quality_;
+
+  // --- Reconnect / link FSM state ---
+  // Start OK: the first bad poll drives OK -> LOST_TRANSIENT cleanly (and stamps
+  // link_lost_at_). Starting in LOST_TRANSIENT would need link_lost_at_ primed
+  // or it would latch immediately.
+  LinkFsm link_fsm_ {LinkFsm::OK};
+  std::optional<rclcpp::Time> link_good_since_;
+  std::optional<rclcpp::Time> link_bad_since_;
+  rclcpp::Time link_lost_at_;
+  rclcpp::Time last_reconnect_attempt_;
+  unsigned long reconnect_count_ {0};
+  bool ack_extreme_seen_ {false};
 
   // --- Edge-logging state ---
   bool have_link_ok_ {false};
