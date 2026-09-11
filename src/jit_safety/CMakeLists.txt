@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
-project(estop)
+project(jit_safety)
 
-# xcrsf's README examples use C++23 features (structured bindings on
-# aggregate return types, etc). If your compiler can't do -std=c++23,
-# drop this to 20 and see if it still builds.
+# xcrsf's README examples use C++23 features (structured bindings on aggregate
+# return types, etc). If your compiler can't do -std=c++23, drop this to 20 and
+# see if it still builds.
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 23)
 endif()
@@ -17,37 +17,35 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
+find_package(jit_msgs REQUIRED)
 
-# xcrsf is installed system-wide via its own `sudo make install`
-# (not a ROS package / not colcon-built), so we locate it manually.
+# xcrsf is installed system-wide via its own `sudo make install` (not a ROS
+# package / not colcon-built), so we locate it manually.
 find_library(XCRSF_LIBRARY xcrsf REQUIRED)
 find_path(XCRSF_INCLUDE_DIR xcrsf/crossfire.h REQUIRED)
 
-# libgpiod — install with: sudo apt install libgpiod-dev
+# libgpiod - install with: sudo apt install libgpiod-dev
 find_library(GPIOD_LIBRARY gpiod REQUIRED)
 find_path(GPIOD_INCLUDE_DIR gpiod.h REQUIRED)
 
 add_executable(crsf_channel_node src/crsf_channel_node.cpp)
 target_include_directories(crsf_channel_node PRIVATE ${XCRSF_INCLUDE_DIR})
-ament_target_dependencies(crsf_channel_node rclcpp std_msgs)
+ament_target_dependencies(crsf_channel_node rclcpp std_msgs jit_msgs)
 target_link_libraries(crsf_channel_node ${XCRSF_LIBRARY})
 
 add_executable(gpio_estop_node src/gpio_estop_node.cpp)
 target_include_directories(gpio_estop_node PRIVATE ${GPIOD_INCLUDE_DIR})
-ament_target_dependencies(gpio_estop_node rclcpp std_msgs)
+ament_target_dependencies(gpio_estop_node rclcpp std_msgs jit_msgs)
 target_link_libraries(gpio_estop_node ${GPIOD_LIBRARY})
 
-add_executable(manual_control_node src/manual_control_node.cpp)
-ament_target_dependencies(manual_control_node rclcpp std_msgs mavros_msgs)
+add_executable(system_monitor_node src/system_monitor_node.cpp)
+ament_target_dependencies(system_monitor_node rclcpp std_msgs mavros_msgs jit_msgs)
 
 install(TARGETS
   crsf_channel_node
   gpio_estop_node
-  manual_control_node
+  system_monitor_node
   DESTINATION lib/${PROJECT_NAME})
-
-install(DIRECTORY launch config
-  DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

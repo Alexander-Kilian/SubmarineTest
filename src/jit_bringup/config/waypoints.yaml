@@ -1,0 +1,31 @@
+# Mission for local_guided_node.
+#
+# This is a PLAIN YAML file, not a ROS 2 parameter file. ROS 2 parameters
+# cannot express a list of maps, so the node takes a path and parses this
+# itself. The path is set by the launch file's `waypoint_file` argument.
+#
+# EVERY VALUE IS AN OFFSET FROM THE DATUM captured when LOCAL_GUIDED is
+# selected, not an absolute position. That is what absorbs the estimator drift
+# accumulated between boot and the start of the run.
+#
+#   x  metres East of the datum   (local ENU frame, NOT the vehicle's heading)
+#   y  metres North of the datum
+#   z  OPTIONAL. Metres Up from the depth at mode entry - negative is deeper.
+#      Omit it to hold the entry depth, which is the default and what you want
+#      for surface work: the vehicle then does not fight the trim changes it
+#      sees during testing.
+#
+# Re-entering LOCAL_GUIDED recaptures the datum and restarts at index 0, so the
+# re-run gesture is a single switch cycle (ch8 UP -> MID -> UP).
+
+waypoints:
+  # First test: one waypoint, two metres out, holding the entry depth.
+  - {x: 2.0, y: 0.0}
+
+  # --- The link-cut test -------------------------------------------------
+  # Uncomment to run it. A deliberately deep waypoint submerges the antenna,
+  # which drops the RC link, which opens the relay in hardware and floats the
+  # sub back up. The thing under test is what happens NEXT: when the link
+  # returns and the relay re-closes, the vehicle must NOT dive back down. That
+  # only holds if the disarm and the GUIDED exit both completed.
+  # - {x: 2.0, y: 2.0, z: -3.0}

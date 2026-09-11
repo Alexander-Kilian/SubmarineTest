@@ -1,54 +1,64 @@
 // crsf_channel_node.cpp
 //
 // Reads CRSF/ELRS channel data from a T8L-paired receiver via the xcrsf
-// library and publishes:
-//   - crsf/channels           (std_msgs/UInt16MultiArray)  all 16 raw channels
-//   - crsf/link_ok            (std_msgs/Bool)               receiver link healthy
-//   - crsf/channel_threshold  (std_msgs/Bool)               "manual control permitted"
+// library. This node is the sensor at the top of the stack and it publishes
+// four things, every poll cycle, without exception:
+//
+//   - crsf/channels      (std_msgs/UInt16MultiArray)  all 16 raw channels
+//   - crsf/link_ok       (std_msgs/Bool)              receiver link healthy
+//   - crsf/relay_permit  (std_msgs/Bool)              hardware e-stop permit
+//   - mode/request       (jit_msgs/ModeRequest)       requested operating mode
+//
+// PUBLISH-ALWAYS CONTRACT. Every one of those topics is published on every
+// timer tick regardless of link state. Two consumers depend on that:
+// gpio_estop_node treats stale crsf/relay_permit as "open the relay", and
+// system_monitor_node treats stale crsf/link_ok as CRSF_NODE_DEAD. Silence from
+// this node must always mean "this node died", never "nothing to report".
+//
+// WHY THE LINK LATCH LIVES HERE. crsf/relay_permit goes straight to
+// gpio_estop_node with no node in between, because the path from the operator's
+// switch to the motor relay should be as short as the software can make it. The
+// link state machine that decides the permit therefore has to live in this node
+// too - moving it to the health monitor would put a second process in that
+// path. system_monitor_node consumes crsf/link_ok raw and applies its own,
+// separate policy for the software gate.
+//
+// CHANNEL 8 - THE 3-POSITION SWITCH. One switch, three detents, and it is
+// currently doing double duty as both the mode selector and the e-stop:
+//
+//   DOWN  (raw ~191)   -> ESTOP        : relay permit false, mode SAFE
+//   MID   (raw ~997)   -> MANUAL       : relay permit true
+//   UP    (raw ~1792)  -> LOCAL_GUIDED : relay permit true
+//
+// GLOBAL_GUIDED has no detent. It is reachable only by editing kDetentModes
+// below, which is deliberate: the GPS is not connected and that mode must not
+// be selectable by accident at the pool.
 //
 // WIRING NOTE: on the real vehicle the link to the ELRS receiver is ONE-WAY.
 // Only the receiver's TX line is wired to the Pi's UART RX (GPIO15); the Pi's
-// UART TX (GPIO14) is NOT connected to the receiver (space constraints on the
-// penetrator). The Pi therefore cannot transmit to the receiver at all - no
-// telemetry uplink, no CRSF config. This is fine for reading channels: the
-// receiver still streams the RC-channels frame and the link-statistics frame
-// (uplink LQ / RSSI) down that single wire, so is_paired() and the planned
-// get_link_state() quality check both still work.
-//
-// crsf/channel_threshold is the safety-relevant output. It is true ONLY when
-// BOTH of these hold:
-//   1. the link state machine is OK, and
-//   2. the enable channel (the 3-position switch, channel index
-//      `enable_channel_index`) is inside the neutral centre band.
+// UART TX (GPIO14) is NOT connected (space constraints on the penetrator). The
+// Pi cannot transmit to the receiver at all - no telemetry uplink, no CRSF
+// config. That is fine for reading channels: the receiver still streams the
+// RC-channels frame and the link-statistics frame down that single wire.
 //
 // LINK LOSS / RECONNECT (trip fast, recover slow):
-//   - Any loss of link -> crsf/channel_threshold goes false immediately.
-//   - xcrsf does not self-heal after a serial dropout (is_paired() stays
-//     false), so on a sustained loss the node destroys and recreates the
-//     XCrossfire object and re-opens the port, ~1 Hz, until the link returns.
-//   - LinkFsm::LOST_TRANSIENT: link is back is not enough - it must be healthy
+//   - Any loss of link -> crsf/relay_permit goes false immediately, no debounce.
+//   - xcrsf does not self-heal after a serial dropout (is_paired() stays false),
+//     so on a sustained loss the node destroys and recreates the XCrossfire
+//     object and re-opens the port, ~1 Hz, until the link returns.
+//   - LOST_TRANSIENT: the link being back is not enough - it must be healthy
 //     continuously for RECOVER_HOLD_S before the permit is restored. This
 //     debounces a flapping link.
-//   - LinkFsm::LATCHED: if the link stays down longer than LATCH_TIMEOUT_S the
-//     permit is latched off. Clearing it requires the operator to move the
-//     enable switch to an extreme (e-stop) detent and back to centre, with a
-//     live link - a deliberate acknowledgement. (A crash+respawn loses this
-//     latch; that edge case is accepted and handled by the operator.)
+//   - LATCHED: if the link stays down longer than LATCH_TIMEOUT_S the permit is
+//     latched off. Clearing it requires the operator to move the switch to the
+//     ESTOP detent and back, with a live link - a deliberate acknowledgement.
+//     (A crash + respawn loses this latch; that edge case is accepted and
+//     handled by the operator.)
 //
-// Moving the switch out of the centre band by hand is the normal manual
-// e-stop: instant false, instant clear, NO latch. Only link loss latches.
+// Moving the switch to the ESTOP detent by hand is the normal manual e-stop:
+// instant false, instant clear, NO latch. Only link loss latches.
 //
-// crsf/channel_threshold is published on EVERY poll cycle - the node never
-// goes silent while running, so a downstream consumer that stops seeing
-// messages can treat that as "this node died" (see the watchdog in
-// gpio_estop_node and the enable-timeout in manual_control_node).
-//
-// A separate node (gpio_estop_node) subscribes to crsf/channel_threshold and
-// drives the relay GPIO. "Decode CRSF" and "touch hardware GPIO" stay as two
-// independent, individually testable nodes. The link FSM / latch policy will
-// move to a dedicated health-monitor node in a later refactor.
-//
-// Verified against the real installed header (/usr/local/include/xcrsf/crossfire.h):
+// Verified against the installed header (/usr/local/include/xcrsf/crossfire.h):
 //   XCrossfire(uart_path, speed_t baud=420000), open_port(), close_port(),
 //   is_paired(), get_channel_state() -> std::array<uint16_t, 16>, get_link_state().
 
@@ -60,8 +70,11 @@
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/u_int16_multi_array.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/u_int16_multi_array.hpp"
+
+#include "jit_msgs/msg/mode.hpp"
+#include "jit_msgs/msg/mode_request.hpp"
 
 #include "xcrsf/crossfire.h"
 
@@ -73,7 +86,7 @@ namespace
 constexpr double RECONNECT_GRACE_S = 0.5;   // link bad this long before the first object-recreate
 constexpr double RECONNECT_PERIOD_S = 1.0;  // between recreate attempts
 constexpr double RECOVER_HOLD_S = 1.0;      // link healthy continuously before the permit is restored
-constexpr double LATCH_TIMEOUT_S = 5.0;     // link bad continuously -> LATCHED (operator switch toggle to clear)
+constexpr double LATCH_TIMEOUT_S = 5.0;     // link bad continuously -> LATCHED
 }  // namespace
 
 class CrsfChannelNode : public rclcpp::Node
@@ -82,26 +95,23 @@ public:
   CrsfChannelNode()
   : Node("crsf_channel_node"), port_open_(false)
   {
-    // --- Parameters (set via a launch file or `ros2 run ... --ros-args -p`) ---
+    // --- Parameters ---
     serial_port_ = this->declare_parameter<std::string>("serial_port", "/dev/ttyAMA0");
     poll_rate_hz_ = this->declare_parameter<double>("poll_rate_hz", 50.0);
 
     // CRSF UART baud rate. Passed to XCrossfire (whose own default is 420000,
-    // the CRSF standard). This default matches the rate currently configured
-    // on the ELRS receiver - keep the two in sync, or frames never decode and
+    // the CRSF standard). This default matches the rate currently configured on
+    // the ELRS receiver - keep the two in sync, or frames never decode and
     // is_paired() stays false. xcrsf sets non-standard rates via termios2.
     crsf_baud_ = this->declare_parameter<int>("crsf_baud", 115200);
 
-    // Enable channel: the 3-position switch. 0-based index into the 16-channel
+    // Mode switch: the 3-position switch. 0-based index into the 16-channel
     // CRSF array. Default 7 (i.e. "channel 8" as counted on the transmitter).
-    // Verify with `ros2 topic echo /crsf/channels` that index 7 is the one
-    // that swings between the switch detents (observed ~191 / ~997 / ~1792);
-    // override the parameter if not.
-    enable_channel_index_ = this->declare_parameter<int>("enable_channel_index", 7);
+    mode_channel_index_ = this->declare_parameter<int>("mode_channel_index", 7);
 
-    // Neutral centre band for the enable switch, in raw CRSF counts. The
-    // switch centre detent was observed at ~997, the extremes at ~191 / ~1792,
-    // so [700, 1300] leaves roughly 500 counts of margin to each extreme.
+    // Detent bands, in raw CRSF counts. Detents observed at ~191 / ~997 / ~1792,
+    // so [700, 1300] for MID leaves roughly 500 counts of margin either side.
+    // Below neutral_low is DOWN, above neutral_high is UP.
     neutral_low_ = this->declare_parameter<int>("neutral_low", 700);
     neutral_high_ = this->declare_parameter<int>("neutral_high", 1300);
 
@@ -116,7 +126,8 @@ public:
     // --- Publishers ---
     channels_pub_ = this->create_publisher<std_msgs::msg::UInt16MultiArray>("crsf/channels", 10);
     link_ok_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/link_ok", 10);
-    threshold_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/channel_threshold", 10);
+    permit_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/relay_permit", 10);
+    mode_pub_ = this->create_publisher<jit_msgs::msg::ModeRequest>("mode/request", 10);
 
     // --- Open the CRSF serial link ---
     crossfire_ = std::make_unique<crossfire::XCrossfire>(
@@ -130,7 +141,7 @@ public:
       RCLCPP_ERROR(
         this->get_logger(),
         "Failed to open CRSF port '%s' at %d baud - will recreate and retry ~%.1f Hz. "
-        "Publishing crsf/channel_threshold=false until it recovers.",
+        "Publishing crsf/relay_permit=false until it recovers.",
         serial_port_.c_str(), crsf_baud_, 1.0 / RECONNECT_PERIOD_S);
     }
 
@@ -143,9 +154,10 @@ public:
 
     RCLCPP_INFO(
       this->get_logger(),
-      "Enable switch = channel index %d; neutral band = [%d, %d] counts; poll = %.1f Hz. "
-      "Link loss latches after %.0f s; clear by toggling the switch to an extreme and back.",
-      enable_channel_index_, neutral_low_, neutral_high_, poll_rate_hz_, LATCH_TIMEOUT_S);
+      "Mode switch = channel index %d. DOWN(<%d)=ESTOP, MID=MANUAL, UP(>%d)=LOCAL_GUIDED. "
+      "Poll = %.1f Hz. Link loss latches after %.0f s; clear by moving the switch to the "
+      "ESTOP detent and back.",
+      mode_channel_index_, neutral_low_, neutral_high_, poll_rate_hz_, LATCH_TIMEOUT_S);
 
     // --- Poll timer ---
     const auto period = std::chrono::duration<double>(1.0 / poll_rate_hz_);
@@ -156,7 +168,7 @@ public:
 
 private:
   enum class LinkFsm { OK, LOST_TRANSIENT, LATCHED };
-  enum class SwitchZone { UNKNOWN, CENTER, EXTREME };
+  enum class Detent { UNKNOWN, DOWN, MID, UP };
 
   static const char * fsm_name(LinkFsm s)
   {
@@ -167,14 +179,32 @@ private:
     }
     return "?";
   }
-  static const char * zone_name(SwitchZone z)
+
+  static const char * detent_name(Detent d)
   {
-    switch (z) {
-      case SwitchZone::UNKNOWN: return "unknown";
-      case SwitchZone::CENTER: return "centre";
-      case SwitchZone::EXTREME: return "extreme";
+    switch (d) {
+      case Detent::UNKNOWN: return "unknown";
+      case Detent::DOWN: return "DOWN/ESTOP";
+      case Detent::MID: return "MID/MANUAL";
+      case Detent::UP: return "UP/LOCAL_GUIDED";
     }
     return "?";
+  }
+
+  // The detent -> mode table. GLOBAL_GUIDED is deliberately absent: change the
+  // UP entry here and rebuild if you want to bench-test it. See the header.
+  //
+  // The values come from Mode.msg, which is the single definition of the mode
+  // enum; ModeRequest carries one of them in its `mode` field.
+  static uint8_t detent_mode(Detent d)
+  {
+    switch (d) {
+      case Detent::MID: return jit_msgs::msg::Mode::MANUAL;
+      case Detent::UP: return jit_msgs::msg::Mode::LOCAL_GUIDED;
+      case Detent::DOWN:
+      case Detent::UNKNOWN:
+      default: return jit_msgs::msg::Mode::SAFE;
+    }
   }
 
   void poll_callback()
@@ -198,38 +228,52 @@ private:
     }
     publish_link_ok(link);
 
-    // 2. Read the switch position (only meaningful with a live link).
-    SwitchZone zone = SwitchZone::UNKNOWN;
+    // 2. Read the switch detent (only meaningful with a live link).
+    Detent detent = Detent::UNKNOWN;
     if (link) {
       const std::array<uint16_t, 16> channels = crossfire_->get_channel_state();
       std_msgs::msg::UInt16MultiArray channels_msg;
       channels_msg.data.assign(channels.begin(), channels.end());
       channels_pub_->publish(channels_msg);
 
-      if (enable_channel_index_ < 0 ||
-        static_cast<size_t>(enable_channel_index_) >= channels.size())
+      if (mode_channel_index_ < 0 ||
+        static_cast<size_t>(mode_channel_index_) >= channels.size())
       {
         RCLCPP_WARN_THROTTLE(
           this->get_logger(), *this->get_clock(), 5000,
-          "enable_channel_index %d is out of range [0, %zu); treating the switch as "
-          "not centred. Set the parameter to your switch channel.",
-          enable_channel_index_, channels.size());
+          "mode_channel_index %d is out of range [0, %zu); treating the switch as "
+          "unknown, which denies the relay permit. Set the parameter to your switch channel.",
+          mode_channel_index_, channels.size());
       } else {
-        const uint16_t value = channels[enable_channel_index_];
-        zone = (value >= static_cast<uint16_t>(neutral_low_) &&
-                value <= static_cast<uint16_t>(neutral_high_))
-          ? SwitchZone::CENTER
-          : SwitchZone::EXTREME;
+        detent = classify(channels[mode_channel_index_]);
       }
     }
 
-    // 3. Run the link state machine and publish the permit.
-    update_link_fsm(now, link, zone);
-    const bool permitted = (link_fsm_ == LinkFsm::OK) && (zone == SwitchZone::CENTER);
-    publish_threshold(permitted, zone);
+    // 3. Run the link state machine, then publish the permit and the mode request.
+    update_link_fsm(now, link, detent);
+
+    // The entire permit expression. It deliberately ignores mode, MAVROS,
+    // mission state and jit/health: flipping the switch must cut power without
+    // consulting anything that could be busy or dead.
+    const bool permitted = (link_fsm_ == LinkFsm::OK) && (detent != Detent::DOWN) &&
+      (detent != Detent::UNKNOWN);
+
+    publish_permit(permitted, detent);
+    publish_mode_request(now, detent);
   }
 
-  void update_link_fsm(const rclcpp::Time & now, bool link, SwitchZone zone)
+  Detent classify(uint16_t raw) const
+  {
+    if (raw < static_cast<uint16_t>(neutral_low_)) {
+      return Detent::DOWN;
+    }
+    if (raw > static_cast<uint16_t>(neutral_high_)) {
+      return Detent::UP;
+    }
+    return Detent::MID;
+  }
+
+  void update_link_fsm(const rclcpp::Time & now, bool link, Detent detent)
   {
     // Continuous-healthy streak, for the "recover slow" debounce.
     if (link) {
@@ -248,7 +292,7 @@ private:
       case LinkFsm::OK:
         if (!link) {
           link_lost_at_ = now;
-          ack_extreme_seen_ = false;
+          ack_estop_seen_ = false;
           link_fsm_ = LinkFsm::LOST_TRANSIENT;
         }
         break;
@@ -262,12 +306,14 @@ private:
         break;
 
       case LinkFsm::LATCHED:
-        // Operator acknowledgement: switch to an extreme detent, then back to
-        // centre, with a live and stable link.
-        if (link && zone == SwitchZone::EXTREME) {
-          ack_extreme_seen_ = true;
+        // Operator acknowledgement: move to the ESTOP detent, then back off it,
+        // with a live and stable link. The ESTOP detent specifically - not any
+        // extreme - because acknowledging a fault by selecting a guided mode
+        // would be a genuinely bad gesture to build in.
+        if (link && detent == Detent::DOWN) {
+          ack_estop_seen_ = true;
         }
-        if (link_stable && ack_extreme_seen_ && zone == SwitchZone::CENTER) {
+        if (link_stable && ack_estop_seen_ && detent == Detent::MID) {
           link_fsm_ = LinkFsm::OK;
         }
         break;
@@ -277,21 +323,21 @@ private:
       switch (link_fsm_) {
         case LinkFsm::OK:
           RCLCPP_INFO(
-            this->get_logger(), "Link FSM: %s -> OK (link stable %.1f s). Permit restored.",
+            this->get_logger(), "Link FSM: %s -> OK (link stable %.1f s). Relay permit restored.",
             fsm_name(prev), RECOVER_HOLD_S);
           break;
         case LinkFsm::LOST_TRANSIENT:
           RCLCPP_WARN(
             this->get_logger(),
-            "Link FSM: OK -> LOST_TRANSIENT. E-stop asserted; recreating the CRSF link. "
-            "Auto-recovers if healthy again within %.0f s, otherwise latches.",
+            "Link FSM: OK -> LOST_TRANSIENT. Relay permit withdrawn; recreating the CRSF "
+            "link. Auto-recovers if healthy again within %.0f s, otherwise latches.",
             LATCH_TIMEOUT_S);
           break;
         case LinkFsm::LATCHED:
           RCLCPP_ERROR(
             this->get_logger(),
-            "Link FSM: LOST_TRANSIENT -> LATCHED (link down > %.0f s). E-stop held. "
-            "Toggle the enable switch to an extreme detent and back to centre to re-enable.",
+            "Link FSM: LOST_TRANSIENT -> LATCHED (link down > %.0f s). Relay permit held "
+            "off. Move the switch to the ESTOP detent (DOWN) and back to MID to re-enable.",
             LATCH_TIMEOUT_S);
           break;
       }
@@ -331,9 +377,9 @@ private:
   // TODO(link-quality): once the return type of crossfire_->get_link_state()
   // in /usr/local/include/xcrsf/crossfire.h is known, additionally require its
   // link-quality / RSSI to be >= min_link_quality_. That covers the case where
-  // the ELRS receiver is configured to HOLD the last channel values (or output
-  // configured failsafe positions) on TX loss instead of stopping frames - in
-  // that case is_paired() can stay true even though the transmitter is gone.
+  // the ELRS receiver is configured to HOLD the last channel values on TX loss
+  // instead of stopping frames - is_paired() can stay true even though the
+  // transmitter is gone.
   bool link_healthy()
   {
     return crossfire_->is_paired();
@@ -356,27 +402,40 @@ private:
     }
   }
 
-  void publish_threshold(bool permitted, SwitchZone zone)
+  void publish_permit(bool permitted, Detent detent)
   {
     std_msgs::msg::Bool msg;
     msg.data = permitted;
-    threshold_pub_->publish(msg);
+    permit_pub_->publish(msg);
 
-    if (!have_threshold_ || permitted != last_threshold_) {
-      have_threshold_ = true;
-      last_threshold_ = permitted;
+    if (!have_permit_ || permitted != last_permit_) {
+      have_permit_ = true;
+      last_permit_ = permitted;
       if (permitted) {
         RCLCPP_INFO(
           this->get_logger(),
-          "Manual control PERMITTED: link FSM OK and enable switch (index %d) in "
-          "neutral band [%d, %d].",
-          enable_channel_index_, neutral_low_, neutral_high_);
+          "Relay permit GRANTED: link FSM OK and switch at %s.", detent_name(detent));
       } else {
         RCLCPP_WARN(
           this->get_logger(),
-          "Manual control NOT permitted: link FSM = %s, switch = %s.",
-          fsm_name(link_fsm_), zone_name(zone));
+          "Relay permit WITHDRAWN: link FSM = %s, switch = %s.",
+          fsm_name(link_fsm_), detent_name(detent));
       }
+    }
+  }
+
+  void publish_mode_request(const rclcpp::Time & now, Detent detent)
+  {
+    jit_msgs::msg::ModeRequest msg;
+    msg.stamp = now;
+    msg.mode = detent_mode(detent);
+    msg.source = jit_msgs::msg::ModeRequest::SOURCE_RC;
+    mode_pub_->publish(msg);
+
+    if (!have_detent_ || detent != last_detent_) {
+      have_detent_ = true;
+      last_detent_ = detent;
+      RCLCPP_INFO(this->get_logger(), "Switch detent -> %s.", detent_name(detent));
     }
   }
 
@@ -387,8 +446,8 @@ private:
   int crsf_baud_;
   double poll_rate_hz_;
 
-  // --- Enable-switch config ---
-  int enable_channel_index_;
+  // --- Switch config ---
+  int mode_channel_index_;
   int neutral_low_;
   int neutral_high_;
   int min_link_quality_;
@@ -403,19 +462,22 @@ private:
   rclcpp::Time link_lost_at_;
   rclcpp::Time last_reconnect_attempt_;
   unsigned long reconnect_count_ {0};
-  bool ack_extreme_seen_ {false};
+  bool ack_estop_seen_ {false};
 
   // --- Edge-logging state ---
   bool have_link_ok_ {false};
   bool last_link_ok_ {false};
-  bool have_threshold_ {false};
-  bool last_threshold_ {false};
+  bool have_permit_ {false};
+  bool last_permit_ {false};
+  bool have_detent_ {false};
+  Detent last_detent_ {Detent::UNKNOWN};
 
   // --- ROS interfaces ---
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Publisher<std_msgs::msg::UInt16MultiArray>::SharedPtr channels_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr link_ok_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr threshold_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr permit_pub_;
+  rclcpp::Publisher<jit_msgs::msg::ModeRequest>::SharedPtr mode_pub_;
 };
 
 int main(int argc, char * argv[])

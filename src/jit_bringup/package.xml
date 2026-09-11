@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>jit_bringup</name>
+  <version>0.1.0</version>
+  <description>Launch files and configuration for the JIT submarine stack.
+    No source code lives here.</description>
+  <maintainer email="johns175@my.erau.edu">seam</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>jit_safety</exec_depend>
+  <exec_depend>jit_control</exec_depend>
+  <exec_depend>jit_ui</exec_depend>
+  <exec_depend>jit_msgs</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
