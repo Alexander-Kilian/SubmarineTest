@@ -31,9 +31,21 @@
 //   Observed raw values: min 191, centre 997, max 1792.
 //
 // Publishing rules:
-//   - jit/mode must be MANUAL and vehicle/ready must be true, or this node
-//     publishes nothing at all. Publishing while not the active source is
-//     treated as a defect by vehicle_interface_node, so don't.
+//   - jit/mode must be MANUAL, or this node publishes nothing at all.
+//     Publishing while not the active source is treated as a defect by
+//     vehicle_interface_node, so don't.
+//   - It must NOT wait for vehicle/ready. That gate deadlocks the two nodes
+//     against each other: vehicle_interface_node only publishes
+//     vehicle/ready=true once it has ARMED, and it will not arm until a fresh
+//     command from the active source already exists. Each ends up waiting for
+//     the other, and the symptom is an endless "Not arming: no fresh command
+//     from the active source" with this node silent. (Seen on the first
+//     in-water test.) local_guided_node has the same constraint and the same
+//     comment.
+//     Publishing while disarmed is harmless: cmd/manual/manual_control is an
+//     internal topic, and vehicle_interface_node only forwards it to MAVROS
+//     once it is armed and in mode. vehicle/ready is kept as a subscription
+//     for diagnostics only.
 //   - If crsf/channels goes stale, x and r fall to zero but the node KEEPS
 //     publishing. Going silent would make vehicle_interface_node safe the
 //     vehicle, which is right when this node dies but wrong for a momentary
@@ -188,9 +200,10 @@ private:
     last_tick_ = now;
 
     const bool mode_ok = (granted_mode_ == Mode::MANUAL) && fresh(mode_stamp_, bus_timeout_s_);
+    // Diagnostics only - deliberately NOT part of the gate. See the header.
     const bool ready_ok = ready_ && fresh(ready_stamp_, bus_timeout_s_);
 
-    if (!mode_ok || !ready_ok) {
+    if (!mode_ok) {
       // Not the active source. Publish nothing and reset the slew memory so a
       // later re-entry ramps from zero rather than from wherever we left off.
       prev_x_ = prev_r_ = 0.0;
@@ -203,7 +216,11 @@ private:
 
     if (!was_publishing_) {
       was_publishing_ = true;
-      RCLCPP_INFO(this->get_logger(), "Active source - publishing MANUAL_CONTROL commands.");
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Active source - publishing MANUAL_CONTROL commands (vehicle/ready = %s; "
+        "vehicle_interface_node forwards them once it has armed).",
+        ready_ok ? "true" : "false");
     }
 
     const bool axes_ok = channels_valid_ && fresh(channels_stamp_, axes_timeout_s_);

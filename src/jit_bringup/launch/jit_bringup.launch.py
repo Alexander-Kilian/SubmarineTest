@@ -134,18 +134,34 @@ def generate_launch_description():
         respawn=True, respawn_delay=RESPAWN_DELAY_S, condition=control_on,
     )
 
+    def on_estop_exit(event, context):
+        """Abort the launch only on a REAL failure.
+
+        gpio_estop_node returns 1 when it throws: GPIO lines it cannot claim, a
+        feedback pin it cannot read, or a welded relay found by the boot
+        self-test. Any of those means the e-stop does not work and nothing else
+        should be running.
+
+        A clean exit (0) or death by signal (negative returncode) is just the
+        launch shutting down - Ctrl-C sends SIGINT to every process, this one
+        included. Treating that as a failure printed an alarming and completely
+        false "the e-stop is not functional" on every normal Ctrl-C.
+        """
+        rc = event.returncode
+        if rc is None or rc <= 0:
+            return [LogInfo(msg="[bringup] gpio_estop_node exited cleanly (rc={}).".format(rc))]
+        return [
+            LogInfo(
+                msg="[bringup] gpio_estop_node FAILED (rc={}) - the e-stop is not "
+                    "functional. Shutting the launch down. Check the GPIO lines, the "
+                    "relay feedback wiring, and whether the boot self-test found a "
+                    "welded relay.".format(rc)
+            ),
+            EmitEvent(event=Shutdown(reason="gpio_estop_node failed")),
+        ]
+
     abort_on_estop_failure = RegisterEventHandler(
-        OnProcessExit(
-            target_action=gpio_node,
-            on_exit=[
-                LogInfo(
-                    msg="[bringup] gpio_estop_node exited - the e-stop is not functional. "
-                        "Shutting the launch down. Check the GPIO lines, the relay feedback "
-                        "wiring, and whether the boot self-test found a welded relay."
-                ),
-                EmitEvent(event=Shutdown(reason="gpio_estop_node exited")),
-            ],
-        )
+        OnProcessExit(target_action=gpio_node, on_exit=on_estop_exit)
     )
 
     return LaunchDescription([

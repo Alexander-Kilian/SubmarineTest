@@ -119,8 +119,13 @@ public:
     latched.reliable();
     latched.transient_local();
 
+    // SensorDataQoS (best-effort): MAVROS publishes its sensor topics
+    // BEST_EFFORT, and a default RELIABLE subscription silently receives
+    // NOTHING from it - rmw reports "incompatible QoS" and drops every sample.
+    // The mission would then always abort with "no fresh pose", which is the
+    // right safety behaviour for entirely the wrong reason.
     pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-      "/mavros/local_position/pose", 10,
+      "/mavros/local_position/pose", rclcpp::SensorDataQoS(),
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr m) {
         pose_ = *m;
         have_pose_ = true;

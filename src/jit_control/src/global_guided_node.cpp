@@ -79,8 +79,9 @@ public:
         }
       });
 
+    // Best-effort, to match MAVROS's sensor-topic QoS. See local_guided_node.
     fix_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
-      "/mavros/global_position/global", 10,
+      "/mavros/global_position/global", rclcpp::SensorDataQoS(),
       [this](const sensor_msgs::msg::NavSatFix::SharedPtr) {
         if (!seen_fix_) {
           seen_fix_ = true;

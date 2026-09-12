@@ -347,7 +347,9 @@ private:
       } else {
         RCLCPP_WARN(
           this->get_logger(), "Faults: %s%s", h.detail.c_str(),
-          (fault_class != 0) ? "  [FAULT-SAFE: relay opens]" : "  [mission-safe: relay held]");
+          (fault_class != 0)
+            ? "  [FAULT-SAFE: relay opens]"
+            : "  [outside FAULT_SAFE_MASK: relay stays closed, disarm only]");
       }
       prev_faults_ = faults;
     }
