@@ -62,6 +62,7 @@
 //   XCrossfire(uart_path, speed_t baud=420000), open_port(), close_port(),
 //   is_paired(), get_channel_state() -> std::array<uint16_t, 16>, get_link_state().
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -147,9 +148,10 @@ public:
 
     RCLCPP_WARN(
       this->get_logger(),
-      "Link-loss detection currently relies on xcrsf is_paired() only. Ensure the "
-      "ELRS receiver failsafe is set to 'no pulses'. TODO: enforce min_link_quality "
-      "(=%d) via get_link_state() so a receiver that HOLDS last values is also caught.",
+      "Link-loss detection relies on xcrsf is_paired() plus a first-frame-decoded "
+      "check. Ensure the ELRS receiver failsafe is set to 'no pulses'. TODO: enforce "
+      "min_link_quality (=%d) via get_link_state() so a receiver that HOLDS last "
+      "values is also caught.",
       min_link_quality_);
 
     RCLCPP_INFO(
@@ -212,7 +214,7 @@ private:
     const rclcpp::Time now = this->now();
 
     // 1. Evaluate the link, recreating the xcrsf object on a sustained loss.
-    bool link = port_open_ && link_healthy();
+    bool link = link_up();
     if (!link) {
       if (!link_bad_since_) {
         link_bad_since_ = now;
@@ -221,31 +223,32 @@ private:
       const double since_attempt = (now - last_reconnect_attempt_).seconds();
       if (bad_for >= RECONNECT_GRACE_S && since_attempt >= RECONNECT_PERIOD_S) {
         attempt_reconnect(now);
-        link = port_open_ && link_healthy();
+        link = link_up();
       }
     } else {
       link_bad_since_.reset();
     }
     publish_link_ok(link);
 
-    // 2. Read the switch detent (only meaningful with a live link).
+    // 2. Read the switch detent (only meaningful with a live link). channels_
+    // was refreshed by link_up(), which only returns true once a real frame has
+    // been decoded, so these values are never the zero-initialised array.
     Detent detent = Detent::UNKNOWN;
     if (link) {
-      const std::array<uint16_t, 16> channels = crossfire_->get_channel_state();
       std_msgs::msg::UInt16MultiArray channels_msg;
-      channels_msg.data.assign(channels.begin(), channels.end());
+      channels_msg.data.assign(channels_.begin(), channels_.end());
       channels_pub_->publish(channels_msg);
 
       if (mode_channel_index_ < 0 ||
-        static_cast<size_t>(mode_channel_index_) >= channels.size())
+        static_cast<size_t>(mode_channel_index_) >= channels_.size())
       {
         RCLCPP_WARN_THROTTLE(
           this->get_logger(), *this->get_clock(), 5000,
           "mode_channel_index %d is out of range [0, %zu); treating the switch as "
           "unknown, which denies the relay permit. Set the parameter to your switch channel.",
-          mode_channel_index_, channels.size());
+          mode_channel_index_, channels_.size());
       } else {
-        detent = classify(channels[mode_channel_index_]);
+        detent = classify(channels_[mode_channel_index_]);
       }
     }
 
@@ -301,6 +304,11 @@ private:
         if (link_stable) {
           link_fsm_ = LinkFsm::OK;
         } else if ((now - link_lost_at_).seconds() >= LATCH_TIMEOUT_S) {
+          // Clear the acknowledgement on ENTRY to LATCHED, not only on the
+          // OK -> LOST_TRANSIENT edge. The flag is sticky, so anything that set
+          // it earlier in this loss event would otherwise carry in and leave the
+          // latch pre-cleared the instant it engaged.
+          ack_estop_seen_ = false;
           link_fsm_ = LinkFsm::LATCHED;
         }
         break;
@@ -364,6 +372,12 @@ private:
       serial_port_, static_cast<speed_t>(crsf_baud_));
     port_open_ = crossfire_->open_port();
 
+    // New object, so nothing has been decoded through it yet. Until a frame
+    // arrives its channel array is all zeros, which must not be read as a
+    // detent - see link_up().
+    frame_seen_ = false;
+    channels_.fill(0);
+
     if (port_open_) {
       RCLCPP_INFO(this->get_logger(), "CRSF port reopened; waiting for the receiver link.");
     } else {
@@ -383,6 +397,50 @@ private:
   bool link_healthy()
   {
     return crossfire_->is_paired();
+  }
+
+  // The full link test: port open, xcrsf reports paired, AND at least one RC
+  // frame has actually been decoded since the current XCrossfire was built.
+  // Refreshes channels_ as a side effect, so poll_callback() does not re-read.
+  //
+  // That last clause is the one that matters. open_port() sets the paired flag
+  // true immediately, before any frame arrives, so on the poll tick right after
+  // attempt_reconnect() the link looks healthy while get_channel_state() still
+  // returns the zero-initialised array - and classify(0) is DOWN. Every
+  // reconnect attempt therefore used to synthesise a phantom ESTOP detent,
+  // which forged the operator acknowledgement that clears LinkFsm::LATCHED: a
+  // 5 s link loss would latch and then release itself ~0.6 s later, with the
+  // relay closing again the moment the transmitter returned. Observed on the
+  // bench 2026-09-16.
+  //
+  // An all-zero array therefore means "no frames yet", not "sticks at zero".
+  // frame_seen_ sticks once set (cleared only by attempt_reconnect), so a
+  // legitimate all-zero reading later can never be misread as a dead link.
+  // Note this cannot be done by watching the channels for CHANGE: with the
+  // transmitter idle the values are stable, so change-detection would
+  // false-trip on a healthy link.
+  bool link_up()
+  {
+    if (!port_open_ || !link_healthy()) {
+      return false;
+    }
+
+    channels_ = crossfire_->get_channel_state();
+
+    if (!frame_seen_) {
+      frame_seen_ = std::any_of(
+        channels_.begin(), channels_.end(), [](uint16_t v) {return v != 0;});
+      if (!frame_seen_) {
+        RCLCPP_WARN_THROTTLE(
+          this->get_logger(), *this->get_clock(), 2000,
+          "CRSF port open and xcrsf reports paired, but no RC frame decoded yet - "
+          "holding the link DOWN and the switch UNKNOWN.");
+        return false;
+      }
+      RCLCPP_INFO(this->get_logger(), "First CRSF frame decoded; link is real.");
+    }
+
+    return true;
   }
 
   void publish_link_ok(bool ok)
@@ -445,6 +503,11 @@ private:
   std::string serial_port_;
   int crsf_baud_;
   double poll_rate_hz_;
+
+  // Last channel array read by link_up(), and whether any frame has been
+  // decoded through the current XCrossfire at all. See link_up().
+  std::array<uint16_t, 16> channels_ {};
+  bool frame_seen_ {false};
 
   // --- Switch config ---
   int mode_channel_index_;
