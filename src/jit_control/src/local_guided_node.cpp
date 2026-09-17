@@ -380,8 +380,11 @@ private:
       check_reached(now, target);
     }
 
-    // Republish continuously. GUIDED position targets do not expire, so this is
-    // for message-loss robustness rather than to satisfy a firmware timeout.
+    // Republish continuously, but note this stream does NOT reach ArduSub at
+    // this rate. vehicle_interface_node dedupes it and forwards a target only
+    // when it moves, because each SET_POSITION_TARGET_LOCAL_NED restarts
+    // AC_WPNav's s-curve and streaming them stops the vehicle accelerating.
+    // What this rate is for is the cmd_timeout_s liveness gate over there.
     // Note this is NOT gated on vehicle/ready: vehicle_interface_node needs a
     // fresh setpoint to exist before it will arm, so waiting for ready here
     // would deadlock the two nodes against each other.

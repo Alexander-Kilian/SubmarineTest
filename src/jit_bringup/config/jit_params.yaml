@@ -104,6 +104,123 @@ vehicle_interface_node:
     arm_stick_epsilon: 60.0
     z_neutral: 500.0
 
+    # --- Guided setpoint dedupe ---
+    # An ArduSub guided position target is a ONE-SHOT command, not a stream.
+    # Each SET_POSITION_TARGET_LOCAL_NED re-anchors AC_WPNav's leg and restarts
+    # its s-curve at zero velocity, so streaming at send_rate_hz pinned the
+    # commanded speed near zero: the sub yawed onto the track bearing and then
+    # sat there. Forward a target only when it moves by more than these
+    # thresholds, in a short burst to cover MAVLink loss, then stay quiet.
+    setpoint_epsilon_m: 0.05
+    setpoint_yaw_epsilon_rad: 0.02
+    setpoint_burst_count: 5
+    setpoint_burst_interval_s: 0.05
+
+    # 'dedupe' (forward on change) or 'continuous' (every tick, the PX4-derived
+    # 20 Hz advice). The launch argument of the same name OVERRIDES this.
+    stream_mode: dedupe
+
+# ===========================================================================
+# VARIANT B - vehicle_interface_raw_node
+# ===========================================================================
+# Same gate, same arming, same disarm rule as variant A. The only difference is
+# the transport: /mavros/setpoint_raw/local with a type_mask we control.
+vehicle_interface_raw_node:
+  ros__parameters:
+    manual_ardusub_mode: STABILIZE
+    guided_ardusub_mode: GUIDED
+    safing_mode: STABILIZE
+
+    health_timeout_s: 0.5
+    mode_timeout_s: 0.5
+    mavros_timeout_s: 3.0
+    cmd_timeout_s: 0.5
+    arm_hold_s: 0.75
+    mode_arm_retry_s: 1.0
+    send_rate_hz: 20.0
+
+    # --- Disarm: project standing rule, identical to variant A ---
+    disarm_retry_hz: 5.0
+    min_disarm_commands: 2
+
+    arm_stick_epsilon: 60.0
+    z_neutral: 500.0
+
+    setpoint_epsilon_m: 0.05
+    setpoint_yaw_epsilon_rad: 0.02
+    setpoint_burst_count: 5
+    setpoint_burst_interval_s: 0.05
+    stream_mode: dedupe
+
+    # --- The reason variant B exists ---
+    #   2552  position + yaw  - IGNORE_V* | IGNORE_AF* | IGNORE_YAW_RATE.
+    #                           Matches what setpoint_position/local sends.
+    #   3576  position only   - the above | IGNORE_YAW. ArduSub chooses the
+    #                           heading. Worth a run: "yawed onto the bearing
+    #                           and then sat there" is also consistent with a
+    #                           commanded yaw fighting the position controller.
+    type_mask: 2552
+    # mavros_msgs/PositionTarget::FRAME_LOCAL_NED
+    coordinate_frame: 1
+
+# ===========================================================================
+# VARIANT C - vehicle_interface_mission_node
+# ===========================================================================
+# Uploads waypoints.yaml as a mission of MAV_CMD_NAV_WAYPOINT items and flies it
+# in AUTO. Nothing is streamed, so stream_mode does not apply.
+vehicle_interface_mission_node:
+  ros__parameters:
+    manual_ardusub_mode: STABILIZE
+    # AUTO, not GUIDED - this variant flies a stored mission.
+    mission_ardusub_mode: AUTO
+    safing_mode: STABILIZE
+
+    health_timeout_s: 0.5
+    mode_timeout_s: 0.5
+    mavros_timeout_s: 3.0
+    cmd_timeout_s: 0.5
+    pose_timeout_s: 1.0
+    arm_hold_s: 0.75
+    mode_arm_retry_s: 1.0
+    send_rate_hz: 20.0
+
+    # --- Disarm: project standing rule, identical to variants A and B ---
+    disarm_retry_hz: 5.0
+    min_disarm_commands: 2
+
+    arm_stick_epsilon: 60.0
+    z_neutral: 500.0
+
+    # --- Mission build ---
+    # Acceptance moves into the firmware here (verify_nav_wp). These are the
+    # same numbers local_guided_node uses so the two are comparable: param1 is
+    # the hold time and param2 the acceptance radius of each NAV_WAYPOINT.
+    radius_m: 0.3
+    dwell_s: 1.0
+    # MAV_FRAME_GLOBAL_RELATIVE_ALT. Sub mission altitude semantics are the
+    # least certain part of this variant: if the vehicle flies the horizontal
+    # track correctly but holds the wrong depth, change this first.
+    mission_frame: 3
+    mission_push_retry_s: 2.0
+
+    # --- Origin for the ENU -> lat/lon conversion ---
+    # There is no GPS. The absolute position does not matter: we convert
+    # datum-relative ENU to lat/lon with this origin and ArduSub converts back
+    # with the same one, so the round trip is the identity. What matters is that
+    # BOTH sides use the same origin, which is why the node confirms by reading
+    # gp_origin back rather than trusting its own write.
+    #
+    # On Sub the EKF origin can only be set ONCE per power cycle. If setting it
+    # fails, power-cycle the vehicle before retrying.
+    mission_origin_lat: 47.397742
+    mission_origin_lon: 8.545594
+    mission_origin_alt: 0.0
+    set_origin_if_absent: true
+    # How long to wait for ArduSub to publish an origin of its own before
+    # offering ours.
+    origin_wait_s: 5.0
+    origin_retry_s: 2.0
+
 manual_control_node:
   ros__parameters:
     # --- channel selection ---

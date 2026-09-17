@@ -1,67 +1,63 @@
-// vehicle_interface_node.cpp
+// vehicle_interface_raw_node.cpp
 //
-// The ONLY node in the system that publishes to MAVROS or calls its services.
-// Extracted wholesale from the old manual_control_node so that arming, mode
-// setting and command arbitration exist exactly once.
+// VARIANT B of the vehicle interface. Identical to vehicle_interface_node in
+// every respect except the transport used for guided position targets:
 //
-// ---------------------------------------------------------------------------
-// WHY A SINGLE WRITER
-// ---------------------------------------------------------------------------
-// The alternative is letting every locomotion node keep its own arm/mode logic
-// and trusting that only one runs at a time. But "only one runs at a time" is
-// exactly the guarantee that does not hold during a mode change, which is
-// precisely when two nodes would both be deciding to arm. Locomotion nodes
-// therefore publish to cmd/<source>/* and never construct a MAVROS client.
+//   variant A  /mavros/setpoint_position/local   geometry_msgs/PoseStamped
+//   variant B  /mavros/setpoint_raw/local        mavros_msgs/PositionTarget   <- this file
 //
-// A command arriving from a source that is not the active one is dropped and
-// logged as a defect - it means a locomotion node is publishing when the bus
-// says it should not be, and that is a bug worth seeing rather than silently
-// absorbing.
+// Both plugins emit the SAME MAVLink message, SET_POSITION_TARGET_LOCAL_NED,
+// and both perform the ENU->NED conversion inside MAVROS, so the values we put
+// in are ENU exactly as the guided nodes produce them. What changes is that
+// setpoint_position hard-codes its type_mask and derives yaw from the pose
+// quaternion, whereas setpoint_raw exposes both. That is the entire reason this
+// variant exists.
 //
 // ---------------------------------------------------------------------------
-// DISARM IS ALWAYS RETRIED UNTIL CONFIRMED  (project standing rule)
+// WHY type_mask IS WORTH TESTING
 // ---------------------------------------------------------------------------
-// /mavros/cmd/arming can return success without the vehicle actually
-// disarming, so the service ACK is never treated as proof. The only acceptable
-// confirmation is /mavros/state.armed going false. run_safing() therefore keeps
-// re-sending the disarm at disarm_retry_hz until the state confirms it, AND
-// sends it at least min_disarm_commands times regardless - never a single
-// fire-and-forget disarm.
+// The observed failure was the sub yawing onto the correct track bearing and
+// then sitting there. The leading explanation is the s-curve reset described in
+// vehicle_interface_node.cpp, but a commanded yaw fighting the position
+// controller is also consistent with that symptom, and the two are separable
+// only by trying them. With `type_mask` as a parameter you can switch between:
+//
+//   2552  position + yaw       (IGNORE_V* | IGNORE_AF* | IGNORE_YAW_RATE)
+//   3576  position only        (the above | IGNORE_YAW - ArduSub picks heading)
+//
+// without a rebuild, which matters when the test site has a slow link.
 //
 // ---------------------------------------------------------------------------
-// SAFING RUNS CONCURRENTLY, NOT IN SEQUENCE
+// EXPERIMENT DESIGN
 // ---------------------------------------------------------------------------
-// An earlier draft disarmed first and only then changed mode out of GUIDED.
-// That has a hole: if the disarm needs several seconds of retries, GUIDED keeps
-// driving toward its target for that whole time. So safing now does all of
-// these on every tick until they take:
+// `stream_mode` is present here and in variant A so the two questions can be
+// separated instead of confounded:
 //
-//   1. request the mode change out of GUIDED immediately - this stops position
-//      tracking now rather than after the disarm confirms;
-//   2. run the disarm retry loop;
-//   3. once out of GUIDED, publish neutral MANUAL_CONTROL so that if the
-//      vehicle is still armed for a moment, the commanded motion is zero;
-//   4. hold vehicle/ready false.
+//   A/dedupe  vs  A/continuous   isolates the RATE question
+//   A/dedupe  vs  B/dedupe       isolates the TRANSPORT / type_mask question
 //
-// Step 1 matters more than it looks: an ArduSub GUIDED position target has NO
-// staleness timeout (verified in ArduSub/mode_guided.cpp - only velocity
-// targets expire). Merely stopping our setpoint stream does not stop the
-// vehicle. If the motor rail is later re-energised with a stale target still
-// loaded, the vehicle drives back to it. Leaving GUIDED is what actually clears
-// the target.
+// Changing transport and rate together would leave a good result unattributable.
 //
 // ---------------------------------------------------------------------------
+// UNCHANGED FROM VARIANT A - do not let these drift
+// ---------------------------------------------------------------------------
+//   - the single-writer rule: this is the only node publishing to MAVROS when
+//     it is the one launched;
+//   - the health gate, the arm preconditions and the mode-before-arm ordering;
+//   - DISARM IS ALWAYS RETRIED UNTIL /mavros/state.armed READS FALSE, and sent
+//     at least min_disarm_commands times regardless. Standing project rule: the
+//     service ACK is never proof.
+//   - safing runs concurrently, leaving the guided mode immediately rather than
+//     after the disarm confirms, because a GUIDED position target has no
+//     staleness timeout.
+//
 // Assumed external behaviour (verify on the bench):
-//   - ArduSub accepts a mode change to GUIDED while disarmed and can arm in it
-//     on the surface with the current ARMING_CHECK set.
-//   - ArduSub accepts a mode change to `safing_mode` (STABILIZE) while armed.
-//   - MAVROS forwards MANUAL_CONTROL unscaled; x/y/r in [-1000,1000],
-//     z in [0,1000] with 500 neutral.
-//   - A guided position target sent ONCE is retained and flown by ArduSub with
-//     no further messages, and setpoint_burst_count repeats are enough to
-//     survive MAVLink loss over the BlueOS router. See forward_active_command.
-//   - MAV_GCS_SYSID on the vehicle equals MAVROS's system id, or mode changes
-//     are silently ignored.
+//   - MAVROS's setpoint_raw plugin converts position ENU->NED and yaw ENU->NED
+//     for coordinate_frame FRAME_LOCAL_NED, the same as setpoint_position does.
+//   - ArduSub honours the type_mask rather than ignoring it and reading every
+//     field.
+//   - A guided position target sent ONCE is retained and flown with no further
+//     messages.
 
 #include <algorithm>
 #include <chrono>
@@ -76,6 +72,7 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "mavros_msgs/msg/manual_control.hpp"
+#include "mavros_msgs/msg/position_target.hpp"
 #include "mavros_msgs/msg/state.hpp"
 #include "mavros_msgs/srv/command_bool.hpp"
 #include "mavros_msgs/srv/set_mode.hpp"
@@ -86,26 +83,29 @@
 using namespace std::chrono_literals;
 using Health = jit_msgs::msg::Health;
 using Mode = jit_msgs::msg::Mode;
+using PositionTarget = mavros_msgs::msg::PositionTarget;
 
-class VehicleInterfaceNode : public rclcpp::Node
+namespace
+{
+// Position + yaw: ignore velocity, acceleration and yaw rate.
+constexpr uint16_t MASK_POS_YAW =
+  PositionTarget::IGNORE_VX | PositionTarget::IGNORE_VY | PositionTarget::IGNORE_VZ |
+  PositionTarget::IGNORE_AFX | PositionTarget::IGNORE_AFY | PositionTarget::IGNORE_AFZ |
+  PositionTarget::IGNORE_YAW_RATE;
+}  // namespace
+
+class VehicleInterfaceRawNode : public rclcpp::Node
 {
 public:
-  VehicleInterfaceNode()
-  : Node("vehicle_interface_node")
+  VehicleInterfaceRawNode()
+  : Node("vehicle_interface_raw_node")
   {
-    // --- ArduSub mode strings ---
-    // Our MANUAL maps to ArduSub STABILIZE by default: auto-levelled roll and
-    // pitch with manual throttle and yaw. Set manual_ardusub_mode:=MANUAL for
-    // raw passthrough with no attitude stabilisation.
     manual_ardusub_mode_ =
       this->declare_parameter<std::string>("manual_ardusub_mode", "STABILIZE");
     guided_ardusub_mode_ =
       this->declare_parameter<std::string>("guided_ardusub_mode", "GUIDED");
-    // What we fall back to when safing. Must not be GUIDED, or the stale
-    // position target is never cleared.
     safing_mode_ = this->declare_parameter<std::string>("safing_mode", "STABILIZE");
 
-    // --- Timeouts / pacing ---
     health_timeout_s_ = this->declare_parameter<double>("health_timeout_s", 0.5);
     mode_timeout_s_ = this->declare_parameter<double>("mode_timeout_s", 0.5);
     mavros_timeout_s_ = this->declare_parameter<double>("mavros_timeout_s", 3.0);
@@ -115,47 +115,33 @@ public:
     mode_arm_retry_s_ = this->declare_parameter<double>("mode_arm_retry_s", 1.0);
     send_rate_hz_ = this->declare_parameter<double>("send_rate_hz", 20.0);
 
-    // Standing rule: never a single fire-and-forget disarm. Even if the very
-    // first command works, send at least this many.
     min_disarm_commands_ = this->declare_parameter<int>("min_disarm_commands", 2);
-
-    // Arm precondition for manual: both sticks within this of centre, in
-    // MANUAL_CONTROL counts.
     arm_stick_epsilon_ = this->declare_parameter<double>("arm_stick_epsilon", 60.0);
     z_neutral_ = this->declare_parameter<double>("z_neutral", 500.0);
 
-    // --- Guided setpoint dedupe (see forward_active_command) ---
-    // A guided position target is a ONE-SHOT command to ArduSub, not a stream.
-    // Only forward one when it actually changes by more than these thresholds.
     setpoint_epsilon_m_ = this->declare_parameter<double>("setpoint_epsilon_m", 0.05);
     setpoint_yaw_epsilon_rad_ =
       this->declare_parameter<double>("setpoint_yaw_epsilon_rad", 0.02);
-    // Each new target is sent this many times, this far apart, then we go quiet.
-    // The repeats cover MAVLink loss over the BlueOS router; they are close
-    // enough together that the s-curve reset they cause is irrelevant.
     setpoint_burst_count_ = this->declare_parameter<int>("setpoint_burst_count", 5);
     setpoint_burst_interval_s_ =
       this->declare_parameter<double>("setpoint_burst_interval_s", 0.05);
 
-    // --- Field experiment knob ---
-    // "dedupe"     forward a guided target only when it moves (the default, and
-    //              the behaviour the s-curve analysis above argues for).
-    // "continuous" forward every tick at send_rate_hz, which is what the widely
-    //              quoted "minimum 2 Hz, typical 20 Hz" advice prescribes. That
-    //              advice is PX4 OFFBOARD guidance - PX4 drops out of offboard
-    //              without a >2 Hz stream - and ArduPilot GUIDED has no such
-    //              requirement for POSITION targets (GUID_TIMEOUT covers only
-    //              attitude, velocity and acceleration). This knob exists so the
-    //              two can be compared on one binary in the water rather than
-    //              argued about from documentation.
     stream_mode_ = this->declare_parameter<std::string>("stream_mode", "dedupe");
     if (stream_mode_ != "dedupe" && stream_mode_ != "continuous") {
       RCLCPP_WARN(
-        this->get_logger(),
-        "stream_mode '%s' is not recognised; falling back to 'dedupe'.",
+        this->get_logger(), "stream_mode '%s' is not recognised; using 'dedupe'.",
         stream_mode_.c_str());
       stream_mode_ = "dedupe";
     }
+
+    // --- The reason this variant exists ---
+    // Default 2552 = position + yaw, matching what setpoint_position/local
+    // sends. Set 3576 to add IGNORE_YAW and let ArduSub choose the heading.
+    type_mask_ = static_cast<uint16_t>(
+      this->declare_parameter<int>("type_mask", static_cast<int>(MASK_POS_YAW)));
+    coordinate_frame_ = static_cast<uint8_t>(
+      this->declare_parameter<int>(
+        "coordinate_frame", static_cast<int>(PositionTarget::FRAME_LOCAL_NED)));
 
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
     health_stamp_ = mode_stamp_ = mavros_stamp_ = t0;
@@ -163,18 +149,16 @@ public:
     last_arm_call_ = last_mode_call_ = t0;
     last_sp_send_ = t0;
 
-    // --- Publishers to MAVROS (the only ones in the system) ---
     manual_pub_ = this->create_publisher<mavros_msgs::msg::ManualControl>(
       "/mavros/manual_control/send", 10);
-    setpoint_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-      "/mavros/setpoint_position/local", 10);
+    // The one line that differs from variant A.
+    setpoint_pub_ = this->create_publisher<PositionTarget>("/mavros/setpoint_raw/local", 10);
 
     rclcpp::QoS latched(1);
     latched.reliable();
     latched.transient_local();
     ready_pub_ = this->create_publisher<std_msgs::msg::Bool>("vehicle/ready", latched);
 
-    // --- Bus ---
     health_sub_ = this->create_subscription<Health>(
       "jit/health", latched,
       [this](const Health::SharedPtr m) {health_ = *m; have_health_ = true;
@@ -184,7 +168,6 @@ public:
       [this](const Mode::SharedPtr m) {granted_mode_ = m->mode; have_mode_ = true;
         mode_stamp_ = this->now();});
 
-    // --- Command sources ---
     manual_sub_ = this->create_subscription<mavros_msgs::msg::ManualControl>(
       "cmd/manual/manual_control", 10,
       [this](const mavros_msgs::msg::ManualControl::SharedPtr m) {
@@ -209,24 +192,27 @@ public:
 
     state_sub_ = this->create_subscription<mavros_msgs::msg::State>(
       "/mavros/state", 10,
-      std::bind(&VehicleInterfaceNode::state_cb, this, std::placeholders::_1));
+      std::bind(&VehicleInterfaceRawNode::state_cb, this, std::placeholders::_1));
 
-    // --- Service clients ---
     arming_client_ = this->create_client<mavros_msgs::srv::CommandBool>("/mavros/cmd/arming");
     set_mode_client_ = this->create_client<mavros_msgs::srv::SetMode>("/mavros/set_mode");
 
     control_timer_ = this->create_wall_timer(
       std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::duration<double>(1.0 / send_rate_hz_)),
-      std::bind(&VehicleInterfaceNode::control_tick, this));
+      std::bind(&VehicleInterfaceRawNode::control_tick, this));
 
     RCLCPP_INFO(
       this->get_logger(),
-      "vehicle_interface_node up. MANUAL -> ArduSub '%s', guided -> '%s', safing -> '%s'. "
-      "Loop %.0f Hz. Guided transport: setpoint_position/local, stream_mode '%s'. "
-      "Disarm retries at %.1f Hz until /mavros/state confirms, minimum %d commands.",
+      "vehicle_interface_raw_node (VARIANT B) up. MANUAL -> '%s', guided -> '%s', "
+      "safing -> '%s'. Loop %.0f Hz. Guided transport: setpoint_raw/local, "
+      "type_mask=%u (%s), frame=%u, stream_mode '%s'. Disarm retries at %.1f Hz until "
+      "/mavros/state confirms, minimum %d commands.",
       manual_ardusub_mode_.c_str(), guided_ardusub_mode_.c_str(), safing_mode_.c_str(),
-      send_rate_hz_, stream_mode_.c_str(), disarm_retry_hz_, min_disarm_commands_);
+      send_rate_hz_, static_cast<unsigned>(type_mask_),
+      (type_mask_ & PositionTarget::IGNORE_YAW) ? "position only" : "position + yaw",
+      static_cast<unsigned>(coordinate_frame_), stream_mode_.c_str(),
+      disarm_retry_hz_, min_disarm_commands_);
   }
 
 private:
@@ -263,16 +249,11 @@ private:
     mavros_mode_ = msg->mode;
     mavros_stamp_ = this->now();
 
-    // Anything that destroys the destination ArduSub is holding invalidates the
-    // dedupe, so the next tick re-sends rather than staying silent about a
-    // target the vehicle no longer has. Leaving GUIDED clears it, and while
-    // disarmed guided_pos_control_run() re-inits wp_nav every loop.
     if (!mavros_armed_ || mavros_mode_ != guided_ardusub_mode_) {
       invalidate_setpoint_dedupe();
     }
   }
 
-  // Force the next guided tick to transmit, whatever the last sent value was.
   void invalidate_setpoint_dedupe()
   {
     have_sent_sp_ = false;
@@ -325,8 +306,7 @@ private:
     last_arm_call_ = this->now();
     if (!arm) {
       ++disarm_sent_;
-      RCLCPP_WARN(
-        this->get_logger(), "DISARM command #%d: %s", disarm_sent_, reason.c_str());
+      RCLCPP_WARN(this->get_logger(), "DISARM command #%d: %s", disarm_sent_, reason.c_str());
     } else {
       RCLCPP_INFO(this->get_logger(), "ARM command: %s", reason.c_str());
     }
@@ -340,8 +320,7 @@ private:
             this->get_logger(), "%s REJECTED (result=%u); will retry.",
             arm ? "ARM" : "DISARM", resp->result);
         }
-        // Note: a success ACK is NOT treated as confirmation. Only
-        // /mavros/state.armed is.
+        // A success ACK is NOT confirmation. Only /mavros/state.armed is.
       });
   }
 
@@ -380,7 +359,6 @@ private:
       return;
     }
 
-    // Gate is holding.
     if (!gate_true_since_) {
       gate_true_since_ = now;
     }
@@ -392,7 +370,6 @@ private:
 
     const std::string target_mode = ardusub_mode_for(granted_mode_);
 
-    // 1. Flight mode first. Never arm before the mode is confirmed.
     if (mavros_mode_ != target_mode) {
       if (mode_call_due(now, mode_arm_retry_s_)) {
         send_set_mode(target_mode);
@@ -401,7 +378,6 @@ private:
       return;
     }
 
-    // 2. Arm, once the preconditions hold.
     if (!mavros_armed_) {
       std::string blocker;
       if ((now - *gate_true_since_).seconds() < arm_hold_s_) {
@@ -424,8 +400,6 @@ private:
       return;
     }
 
-    // 3. Armed and in mode. If the active source has gone quiet, that source
-    //    has died - safe rather than coast on a stale command.
     if (!active_cmd_fresh(now)) {
       run_safing(now, "active command source went stale");
       return;
@@ -462,16 +436,27 @@ private:
       return std::fabs(manual_cmd_.x) < arm_stick_epsilon_ &&
              std::fabs(manual_cmd_.r) < arm_stick_epsilon_;
     }
-    // Guided: a fresh setpoint having arrived at all is the precondition. The
-    // guided node refuses to publish one without a fresh pose, so a setpoint
-    // existing already means the position estimate was good when it was built.
     return true;
   }
 
-  // Yaw about Z from a yaw-only quaternion, as the guided nodes build them.
   static double yaw_of(const geometry_msgs::msg::PoseStamped & p)
   {
     return 2.0 * std::atan2(p.pose.orientation.z, p.pose.orientation.w);
+  }
+
+  // Repack the guided node's ENU PoseStamped into a PositionTarget. MAVROS's
+  // setpoint_raw plugin does the ENU->NED conversion, so the values go in as
+  // the guided node produced them.
+  PositionTarget to_target(const geometry_msgs::msg::PoseStamped & sp) const
+  {
+    PositionTarget t;
+    t.header = sp.header;
+    t.coordinate_frame = coordinate_frame_;
+    t.type_mask = type_mask_;
+    t.position = sp.pose.position;
+    t.yaw = static_cast<float>(yaw_of(sp));
+    t.yaw_rate = 0.0f;
+    return t;
   }
 
   bool setpoint_is_new(const geometry_msgs::msg::PoseStamped & sp) const
@@ -487,30 +472,16 @@ private:
     {
       return true;
     }
+    // Yaw cannot make a target "new" when we are not commanding yaw at all.
+    if (type_mask_ & PositionTarget::IGNORE_YAW) {
+      return false;
+    }
     double dyaw = yaw_of(sp) - yaw_of(last_sent_sp_);
     while (dyaw > M_PI) {dyaw -= 2.0 * M_PI;}
     while (dyaw < -M_PI) {dyaw += 2.0 * M_PI;}
     return std::fabs(dyaw) > setpoint_yaw_epsilon_rad_;
   }
 
-  // MANUAL_CONTROL is a stream and must be sent every tick. A guided position
-  // target is the opposite: a ONE-SHOT command.
-  //
-  // ArduSub routes SET_POSITION_TARGET_LOCAL_NED to guided_set_destination(),
-  // which calls AC_WPNav::set_wp_destination(). That is not idempotent - it
-  // re-anchors the leg origin to the current position target and recalculates
-  // the s-curve from scratch, restarting the acceleration ramp at zero. Sending
-  // it at send_rate_hz therefore reset the ramp 20 times a second and the
-  // vehicle never accelerated: observed in the water as the sub yawing onto the
-  // correct track bearing and then sitting there, with the four horizontal
-  // thrusters within 9 us of each other while the verticals held attitude
-  // normally. The target not expiring (see the safing notes above) is exactly
-  // why it must be sent once, not continuously.
-  //
-  // So: transmit only when the target actually moves, in a short burst to cover
-  // MAVLink loss, then go quiet and let ArduSub fly the leg. The incoming
-  // cmd/*/setpoint stream is still consumed every tick - it is what feeds the
-  // cmd_timeout_s freshness gate - it is just not forwarded.
   void forward_active_command(const rclcpp::Time & now)
   {
     if (granted_mode_ == Mode::MANUAL) {
@@ -522,13 +493,10 @@ private:
 
     auto sp = (granted_mode_ == Mode::LOCAL_GUIDED) ? local_cmd_ : global_cmd_;
 
-    // Experiment arm: stream every tick, ignoring the dedupe entirely. This is
-    // the behaviour that was observed to stop the vehicle accelerating; it is
-    // kept selectable so that result can be reproduced deliberately rather than
-    // taken on trust.
     if (stream_mode_ == "continuous") {
-      sp.header.stamp = now;
-      setpoint_pub_->publish(sp);
+      auto t = to_target(sp);
+      t.header.stamp = now;
+      setpoint_pub_->publish(t);
       last_sent_sp_ = sp;
       have_sent_sp_ = true;
       return;
@@ -541,34 +509,29 @@ private:
       last_sp_send_ = rclcpp::Time(0, 0, now.get_clock_type());
       RCLCPP_INFO(
         this->get_logger(),
-        "New guided target E=%.2f N=%.2f z=%.2f yaw=%.1f deg - sending %d time(s), "
-        "then holding silent.",
+        "New guided target E=%.2f N=%.2f z=%.2f yaw=%.1f deg (mask %u) - sending %d "
+        "time(s), then holding silent.",
         sp.pose.position.x, sp.pose.position.y, sp.pose.position.z,
-        yaw_of(sp) * 180.0 / M_PI, sp_burst_remaining_);
+        yaw_of(sp) * 180.0 / M_PI, static_cast<unsigned>(type_mask_), sp_burst_remaining_);
     }
 
     if (sp_burst_remaining_ > 0 &&
       (last_sp_send_.nanoseconds() == 0 ||
       (now - last_sp_send_).seconds() >= setpoint_burst_interval_s_))
     {
-      auto out = last_sent_sp_;
-      out.header.stamp = now;
-      setpoint_pub_->publish(out);
+      auto t = to_target(last_sent_sp_);
+      t.header.stamp = now;
+      setpoint_pub_->publish(t);
       last_sp_send_ = now;
       --sp_burst_remaining_;
     }
   }
 
   // ---- Safing --------------------------------------------------------------
-  // Every route to a stopped vehicle comes through here: fault-safe and
-  // mission-safe differ only in the logged reason and in whether the monitor
-  // also opened the relay.
   void run_safing(const rclcpp::Time & now, const std::string & reason)
   {
     gate_true_since_.reset();
     publish_ready(false);
-    // Safing leaves GUIDED, which destroys the destination. Re-entry must
-    // re-send it rather than dedupe against a target that no longer exists.
     invalidate_setpoint_dedupe();
 
     if (!safing_active_) {
@@ -578,17 +541,15 @@ private:
     }
 
     if (!have_state_) {
-      return;  // nothing to command yet
+      return;
     }
 
-    // 1. Get out of GUIDED immediately. A GUIDED position target has no
-    //    staleness timeout, so this is what actually stops position tracking.
+    // 1. Out of GUIDED first - the position target has no staleness timeout.
     if (mavros_mode_ == guided_ardusub_mode_ && mode_call_due(now, mode_arm_retry_s_)) {
       send_set_mode(safing_mode_);
     }
 
-    // 2. Disarm: retry until /mavros/state confirms, and at least
-    //    min_disarm_commands times regardless. Standing project rule.
+    // 2. Disarm, retried until /mavros/state confirms. Standing project rule.
     const bool need_more = mavros_armed_ || (disarm_sent_ < min_disarm_commands_);
     if (need_more && arm_call_due(now, 1.0 / std::max(0.1, disarm_retry_hz_))) {
       send_arming(false, reason);
@@ -596,15 +557,14 @@ private:
     if (!mavros_armed_ && disarm_sent_ >= min_disarm_commands_ && !disarm_confirmed_logged_) {
       disarm_confirmed_logged_ = true;
       RCLCPP_INFO(
-        this->get_logger(),
-        "Disarm CONFIRMED by /mavros/state after %d commands.", disarm_sent_);
+        this->get_logger(), "Disarm CONFIRMED by /mavros/state after %d commands.",
+        disarm_sent_);
     }
     if (mavros_armed_) {
       disarm_confirmed_logged_ = false;
     }
 
-    // 3. If still armed but out of GUIDED, command zero motion so nothing is
-    //    left driving while the disarm retries.
+    // 3. Still armed but out of GUIDED: command zero motion.
     if (mavros_armed_ && mavros_mode_ != guided_ardusub_mode_) {
       mavros_msgs::msg::ManualControl neutral;
       neutral.header.stamp = now;
@@ -649,6 +609,8 @@ private:
   int setpoint_burst_count_ {5};
   double setpoint_burst_interval_s_ {0.05};
   std::string stream_mode_ {"dedupe"};
+  uint16_t type_mask_ {MASK_POS_YAW};
+  uint8_t coordinate_frame_ {PositionTarget::FRAME_LOCAL_NED};
 
   // --- Bus ---
   bool have_health_ {false};
@@ -675,8 +637,6 @@ private:
 
   // --- Control state ---
   std::optional<rclcpp::Time> gate_true_since_;
-
-  // --- Guided setpoint dedupe ---
   geometry_msgs::msg::PoseStamped last_sent_sp_;
   bool have_sent_sp_ {false};
   int sp_burst_remaining_ {0};
@@ -693,7 +653,7 @@ private:
 
   // --- ROS interfaces ---
   rclcpp::Publisher<mavros_msgs::msg::ManualControl>::SharedPtr manual_pub_;
-  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr setpoint_pub_;
+  rclcpp::Publisher<PositionTarget>::SharedPtr setpoint_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_pub_;
   rclcpp::Subscription<Health>::SharedPtr health_sub_;
   rclcpp::Subscription<Mode>::SharedPtr mode_sub_;
@@ -709,7 +669,7 @@ private:
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<VehicleInterfaceNode>());
+  rclcpp::spin(std::make_shared<VehicleInterfaceRawNode>());
   rclcpp::shutdown();
   return 0;
 }
