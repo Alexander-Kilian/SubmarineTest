@@ -26,6 +26,18 @@ crsf_channel_node:
     # Declared but not yet enforced (see the link_healthy() TODO).
     min_link_quality: 50
 
+    # --- Submerged link-loss suppression ---
+    # While nav/local/submerged is true, fresher than submerged_timeout_s, AND
+    # the RC link is actually down, this node holds crsf/relay_permit true and
+    # holds mode/request at the last detent read from a live link. With a live
+    # link it changes nothing - the ESTOP detent still cuts the relay.
+    submerged_timeout_s: 0.5
+    # BACKSTOP: the longest this node will hold that permit over a real link
+    # loss, whatever the topic says. Intentionally longer than
+    # local_guided_node's max_submerged_s so the requester normally gives up
+    # first and this only fires if that node is wrong or hung. Do not set 0.
+    max_link_loss_suppress_s: 150.0
+
 gpio_estop_node:
   ros__parameters:
     gpio_chip: gpiochip0
@@ -63,6 +75,10 @@ system_monitor_node:
     # The relay permit, on its own callback group under a multi-threaded
     # executor so nothing else in the node can delay it.
     safety_hz: 20.0
+    # How stale nav/local/submerged may be and still suppress RC_LINK_LOST.
+    # Only RC_LINK_LOST is ever suppressed - CRSF_NODE_DEAD, MAVROS_LOST,
+    # ESTOP_NODE_DEAD and the relay faults all still fire while submerged.
+    submerged_timeout_s: 0.5
     # NOTE-1: only DISARM is implemented. HOLD and SURFACE are placeholders for
     # the autonomy work. Relaxing this alone changes nothing - link loss also
     # withdraws crsf/relay_permit inside crsf_channel_node, which opens the
@@ -113,113 +129,8 @@ vehicle_interface_node:
     # thresholds, in a short burst to cover MAVLink loss, then stay quiet.
     setpoint_epsilon_m: 0.05
     setpoint_yaw_epsilon_rad: 0.02
-    setpoint_burst_count: 5
+    setpoint_burst_count: 2
     setpoint_burst_interval_s: 0.05
-
-    # 'dedupe' (forward on change) or 'continuous' (every tick, the PX4-derived
-    # 20 Hz advice). The launch argument of the same name OVERRIDES this.
-    stream_mode: dedupe
-
-# ===========================================================================
-# VARIANT B - vehicle_interface_raw_node
-# ===========================================================================
-# Same gate, same arming, same disarm rule as variant A. The only difference is
-# the transport: /mavros/setpoint_raw/local with a type_mask we control.
-vehicle_interface_raw_node:
-  ros__parameters:
-    manual_ardusub_mode: STABILIZE
-    guided_ardusub_mode: GUIDED
-    safing_mode: STABILIZE
-
-    health_timeout_s: 0.5
-    mode_timeout_s: 0.5
-    mavros_timeout_s: 3.0
-    cmd_timeout_s: 0.5
-    arm_hold_s: 0.75
-    mode_arm_retry_s: 1.0
-    send_rate_hz: 20.0
-
-    # --- Disarm: project standing rule, identical to variant A ---
-    disarm_retry_hz: 5.0
-    min_disarm_commands: 2
-
-    arm_stick_epsilon: 60.0
-    z_neutral: 500.0
-
-    setpoint_epsilon_m: 0.05
-    setpoint_yaw_epsilon_rad: 0.02
-    setpoint_burst_count: 5
-    setpoint_burst_interval_s: 0.05
-    stream_mode: dedupe
-
-    # --- The reason variant B exists ---
-    #   2552  position + yaw  - IGNORE_V* | IGNORE_AF* | IGNORE_YAW_RATE.
-    #                           Matches what setpoint_position/local sends.
-    #   3576  position only   - the above | IGNORE_YAW. ArduSub chooses the
-    #                           heading. Worth a run: "yawed onto the bearing
-    #                           and then sat there" is also consistent with a
-    #                           commanded yaw fighting the position controller.
-    type_mask: 2552
-    # mavros_msgs/PositionTarget::FRAME_LOCAL_NED
-    coordinate_frame: 1
-
-# ===========================================================================
-# VARIANT C - vehicle_interface_mission_node
-# ===========================================================================
-# Uploads waypoints.yaml as a mission of MAV_CMD_NAV_WAYPOINT items and flies it
-# in AUTO. Nothing is streamed, so stream_mode does not apply.
-vehicle_interface_mission_node:
-  ros__parameters:
-    manual_ardusub_mode: STABILIZE
-    # AUTO, not GUIDED - this variant flies a stored mission.
-    mission_ardusub_mode: AUTO
-    safing_mode: STABILIZE
-
-    health_timeout_s: 0.5
-    mode_timeout_s: 0.5
-    mavros_timeout_s: 3.0
-    cmd_timeout_s: 0.5
-    pose_timeout_s: 1.0
-    arm_hold_s: 0.75
-    mode_arm_retry_s: 1.0
-    send_rate_hz: 20.0
-
-    # --- Disarm: project standing rule, identical to variants A and B ---
-    disarm_retry_hz: 5.0
-    min_disarm_commands: 2
-
-    arm_stick_epsilon: 60.0
-    z_neutral: 500.0
-
-    # --- Mission build ---
-    # Acceptance moves into the firmware here (verify_nav_wp). These are the
-    # same numbers local_guided_node uses so the two are comparable: param1 is
-    # the hold time and param2 the acceptance radius of each NAV_WAYPOINT.
-    radius_m: 0.3
-    dwell_s: 1.0
-    # MAV_FRAME_GLOBAL_RELATIVE_ALT. Sub mission altitude semantics are the
-    # least certain part of this variant: if the vehicle flies the horizontal
-    # track correctly but holds the wrong depth, change this first.
-    mission_frame: 3
-    mission_push_retry_s: 2.0
-
-    # --- Origin for the ENU -> lat/lon conversion ---
-    # There is no GPS. The absolute position does not matter: we convert
-    # datum-relative ENU to lat/lon with this origin and ArduSub converts back
-    # with the same one, so the round trip is the identity. What matters is that
-    # BOTH sides use the same origin, which is why the node confirms by reading
-    # gp_origin back rather than trusting its own write.
-    #
-    # On Sub the EKF origin can only be set ONCE per power cycle. If setting it
-    # fails, power-cycle the vehicle before retrying.
-    mission_origin_lat: 47.397742
-    mission_origin_lon: 8.545594
-    mission_origin_alt: 0.0
-    set_origin_if_absent: true
-    # How long to wait for ArduSub to publish an origin of its own before
-    # offering ours.
-    origin_wait_s: 5.0
-    origin_retry_s: 2.0
 
 manual_control_node:
   ros__parameters:
@@ -259,11 +170,30 @@ local_guided_node:
     # this up rather than chasing the estimator.
     radius_m: 0.3
     dwell_s: 1.0
+    # Vertical acceptance, applied ONLY on a leg that commands a depth change.
+    # A level leg ignores depth error exactly as before, so the persistent trim
+    # error seen holding entry depth on the surface still cannot block a
+    # waypoint. Without this, a dive waypoint directly below the datum has a
+    # horizontal distance of ~0 and is "reached" before the vehicle descends.
+    depth_radius_m: 0.3
     # GUIDED position targets do not expire, so this rate is for message-loss
     # robustness, not to satisfy a firmware timeout.
     setpoint_rate_hz: 10.0
     pose_timeout_s: 1.0
     bus_timeout_s: 0.5
+
+    # --- Submerged operation ---
+    # Below this many metres from the entry depth, by command or measurement,
+    # the node asserts nav/local/submerged and the RC link-loss failsafe is
+    # relaxed. Wants to be SHALLOWER than the depth at which the antenna goes
+    # under, so the flag is live at both consumers before the link drops.
+    submerge_threshold_m: 0.2
+    # DEADMAN. The longest the flag may be asserted in one continuous stretch.
+    # While it is asserted and the link is down there is NO operator stop, so
+    # this is the primary bound on the whole behaviour. On expiry the flag drops
+    # and the mission ABORTs. Set this from the dive you actually intend to fly
+    # plus a margin - not generously. 0 disables it; do not dive like that.
+    max_submerged_s: 120.0
     # Inside this distance the bearing to the target is mostly estimator noise,
     # so hold the last commanded heading instead of spinning.
     yaw_hold_radius_m: 0.5

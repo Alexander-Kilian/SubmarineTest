@@ -58,6 +58,49 @@
 // Moving the switch to the ESTOP detent by hand is the normal manual e-stop:
 // instant false, instant clear, NO latch. Only link loss latches.
 //
+// SUBMERGED OPERATION - DELIBERATELY RELAXING THE ABOVE
+// =====================================================
+// Submerging the vehicle submerges the ELRS antenna and the link drops. That is
+// an expected consequence of the mission, not a fault, but everything above
+// treats it as one. So this node subscribes to nav/local/submerged, published
+// by local_guided_node, and while that flag is true and fresh it does three
+// things:
+//
+//   1. holds crsf/relay_permit TRUE, so the motor rail stays live;
+//   2. holds mode/request at the last detent seen with a live link, instead of
+//      publishing SAFE for an UNKNOWN detent - otherwise system_monitor_node
+//      grants SAFE, local_guided_node leaves its mode, stops the mission and
+//      therefore stops publishing the very flag that got us here;
+//   3. holds off the LATCH timer, because the latch exists to prevent automatic
+//      recovery from an UNEXPLAINED link loss and this one is explained. Should
+//      suppression end with the link still down, the latch clock starts then.
+//
+// IT SPANS THE RESURFACING DEBOUNCE TOO. The hold does not stop the instant the
+// link returns, because the FSM still owes RECOVER_HOLD_S of stable link before
+// it will restore the permit itself. Dropping the hold at first contact would
+// open the relay for that whole second exactly as the vehicle surfaces, raising
+// ESTOP_OPEN and disarming a mission that was about to carry on. So suppression
+// bridges to LinkFsm::OK - but the switch is readable again by then, so during
+// that bridge the ESTOP detent ends the hold immediately.
+//
+// WHAT SUPPRESSION DOES NOT TOUCH. The ESTOP detent always wins whenever it can
+// be read at all: while the link is down it cannot be, and that - not the flag -
+// is what costs the operator their stop. It is local to this node's permit:
+// system_monitor_node applies its own, separate suppression to RC_LINK_LOST and
+// suppresses nothing else, so CRSF_NODE_DEAD, MAVROS_LOST and ESTOP_NODE_DEAD
+// still open the relay through sys/health_ok while submerged.
+//
+// crsf/link_ok IS STILL PUBLISHED TRUTHFULLY. This node is a sensor and does
+// not lie about the link; it is the consequence that is suppressed, not the
+// report. The publish-always contract above is unchanged.
+//
+// THE BACKSTOP. max_link_loss_suppress_s bounds how long this node will hold a
+// permit true over a real link loss, no matter what the topic says. It is
+// deliberately redundant with local_guided_node's own max_submerged_s deadman:
+// that one is in the node requesting the favour, this one is in the node
+// gating the relay, and a hang or a logic error in the former must not be able
+// to disable the hardware e-stop indefinitely.
+//
 // Verified against the installed header (/usr/local/include/xcrsf/crossfire.h):
 //   XCrossfire(uart_path, speed_t baud=420000), open_port(), close_port(),
 //   is_paired(), get_channel_state() -> std::array<uint16_t, 16>, get_link_state().
@@ -119,16 +162,42 @@ public:
     // Link-quality floor (0-100). NOTE: not yet enforced - see link_healthy().
     min_link_quality_ = this->declare_parameter<int>("min_link_quality", 50);
 
+    // --- Submerged link-loss suppression (see the header) ---
+    // How stale nav/local/submerged may be and still suppress. Short: if
+    // local_guided_node dies, the failsafe must re-arm promptly.
+    submerged_timeout_s_ = this->declare_parameter<double>("submerged_timeout_s", 0.5);
+
+    // BACKSTOP. The longest this node will hold the relay permit true over a
+    // real link loss, whatever nav/local/submerged says. Independent of, and
+    // deliberately longer than, local_guided_node's max_submerged_s deadman, so
+    // that in normal operation the requester gives up first and this only fires
+    // if that node is wrong. 0 disables it, which leaves the hardware e-stop
+    // relying entirely on another process behaving.
+    max_link_loss_suppress_s_ =
+      this->declare_parameter<double>("max_link_loss_suppress_s", 150.0);
+
     // --- ROS time init (so age checks are well-defined on the first poll) ---
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
     last_reconnect_attempt_ = t0;
     link_lost_at_ = t0;
+    submerged_stamp_ = t0;
 
     // --- Publishers ---
     channels_pub_ = this->create_publisher<std_msgs::msg::UInt16MultiArray>("crsf/channels", 10);
     link_ok_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/link_ok", 10);
     permit_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/relay_permit", 10);
     mode_pub_ = this->create_publisher<jit_msgs::msg::ModeRequest>("mode/request", 10);
+
+    // --- Subscriptions ---
+    // The only input this node has ever taken. It can relax the link-loss
+    // failsafe but can never assert it - a permit this node would have withheld
+    // for any other reason stays withheld. See suppression_active().
+    submerged_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+      "nav/local/submerged", 10,
+      [this](const std_msgs::msg::Bool::SharedPtr m) {
+        submerged_ = m->data;
+        submerged_stamp_ = this->now();
+      });
 
     // --- Open the CRSF serial link ---
     crossfire_ = std::make_unique<crossfire::XCrossfire>(
@@ -160,6 +229,22 @@ public:
       "Poll = %.1f Hz. Link loss latches after %.0f s; clear by moving the switch to the "
       "ESTOP detent and back.",
       mode_channel_index_, neutral_low_, neutral_high_, poll_rate_hz_, LATCH_TIMEOUT_S);
+
+    if (max_link_loss_suppress_s_ > 0.0) {
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Submerged link-loss suppression is available: while nav/local/submerged is true "
+        "and fresher than %.1f s, the relay permit and the mode request are held through "
+        "a link loss and across the %.1f s recovery debounce that follows it, for at most "
+        "%.0f s in total. The ESTOP detent ends the hold the moment it is readable.",
+        submerged_timeout_s_, RECOVER_HOLD_S, max_link_loss_suppress_s_);
+    } else {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "max_link_loss_suppress_s is 0 - THE SUPPRESSION BACKSTOP IS DISABLED. This node "
+        "will hold the relay permit true over a link loss for as long as another process "
+        "keeps asking. Set a bound before diving.");
+    }
 
     // --- Poll timer ---
     const auto period = std::chrono::duration<double>(1.0 / poll_rate_hz_);
@@ -252,17 +337,124 @@ private:
       }
     }
 
-    // 3. Run the link state machine, then publish the permit and the mode request.
-    update_link_fsm(now, link, detent);
+    // 3. Remember the last detent read from a live link. This is what gets held
+    //    on mode/request during a suppressed loss, and it is only ever written
+    //    from a real frame.
+    if (link && detent != Detent::UNKNOWN) {
+      last_live_detent_ = detent;
+    }
+
+    // 4. Decide whether this link loss is a sanctioned submerged one. Computed
+    //    before the FSM runs, because suppression holds off the latch timer.
+    const bool suppress = suppression_active(now, link, detent);
+
+    // 5. Run the link state machine, then publish the permit and the mode request.
+    update_link_fsm(now, link, detent, suppress);
 
     // The entire permit expression. It deliberately ignores mode, MAVROS,
     // mission state and jit/health: flipping the switch must cut power without
     // consulting anything that could be busy or dead.
-    const bool permitted = (link_fsm_ == LinkFsm::OK) && (detent != Detent::DOWN) &&
-      (detent != Detent::UNKNOWN);
+    //
+    // The suppressed branch is reachable only with the link DOWN - see
+    // suppression_active() - so with a live link this is exactly the expression
+    // it always was, and the ESTOP detent still cuts the relay whatever the
+    // submerged flag says. The cost, stated plainly: during a suppressed loss
+    // the detent is UNKNOWN and there is no operator stop at all. The backstop
+    // timer and local_guided_node's deadman are what bound that window.
+    const bool permitted = suppress
+      ? true
+      : ((link_fsm_ == LinkFsm::OK) && (detent != Detent::DOWN) &&
+      (detent != Detent::UNKNOWN));
 
-    publish_permit(permitted, detent);
-    publish_mode_request(now, detent);
+    publish_permit(permitted, detent, suppress);
+    publish_mode_request(now, detent, suppress);
+  }
+
+  // Is this link loss a sanctioned, submerged one?
+  //
+  // Requires the flag true, the flag fresh, and the backstop unexpired. Beyond
+  // that the test depends on whether the link is back, because the two phases
+  // of a dive want different answers:
+  //
+  //   LINK DOWN - the submerged phase. Hold, unconditionally: the detent is
+  //   UNKNOWN and there is nothing to consult.
+  //
+  //   LINK BACK, FSM NOT YET OK - the resurfacing phase. Keep holding across
+  //   the FSM's RECOVER_HOLD_S debounce, but honour the switch, which is
+  //   readable again. Without this bridge the permit drops for that whole
+  //   second at the moment of surfacing: the relay opens, ESTOP_OPEN is raised,
+  //   and vehicle_interface_node safes and disarms. Harmless on a dive that
+  //   ends at the surface anyway, but it silently kills any mission that
+  //   surfaces and intends to carry on.
+  //
+  //   LINK BACK, FSM OK - over. The permit stands on its own merits again.
+  //
+  // Any failing condition re-arms the normal failsafe, so a dead
+  // local_guided_node, a surfaced vehicle or an overlong dive all fall back to
+  // the ordinary behaviour without needing anything to notice specifically.
+  bool suppression_active(const rclcpp::Time & now, bool link, Detent detent)
+  {
+    const bool requested = submerged_ &&
+      submerged_stamp_.nanoseconds() != 0 &&
+      (now - submerged_stamp_).seconds() <= submerged_timeout_s_;
+
+    const char * done = nullptr;
+    if (!requested) {
+      done = "nav/local/submerged dropped or went stale";
+    } else if (link && link_fsm_ == LinkFsm::OK) {
+      done = "link recovered and the FSM has caught up";
+    } else if (link && detent == Detent::DOWN) {
+      // The switch is readable again and the operator is asking to stop. That
+      // outranks the dive: end the bridge now and let the ESTOP detent take the
+      // permit down this same tick.
+      done = "operator moved to the ESTOP detent during link recovery";
+    } else if (link && detent == Detent::UNKNOWN) {
+      // A live link we cannot read a detent from is not a link we should be
+      // extending trust on - only mode_channel_index being out of range does
+      // this, and that is a misconfiguration, not a dive.
+      done = "link is back but the switch is unreadable";
+    }
+
+    if (done != nullptr) {
+      if (suppress_since_) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Submerged suppression ENDED after %.1f s (%s). Normal link-loss failsafe "
+          "re-armed.",
+          (now - *suppress_since_).seconds(), done);
+        suppress_since_.reset();
+        backstop_expired_ = false;
+      }
+      return false;
+    }
+
+    if (!suppress_since_) {
+      suppress_since_ = now;
+      backstop_expired_ = false;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "SUBMERGED SUPPRESSION ENGAGED - nav/local/submerged is set and the link is %s. "
+        "Holding crsf/relay_permit TRUE and mode/request at %s. Backstop %.0f s.",
+        link ? "recovering" : "down (no operator stop until it returns)",
+        detent_name(last_live_detent_), max_link_loss_suppress_s_);
+    }
+
+    const double held = (now - *suppress_since_).seconds();
+    if (max_link_loss_suppress_s_ > 0.0 && held >= max_link_loss_suppress_s_) {
+      if (!backstop_expired_) {
+        backstop_expired_ = true;
+        RCLCPP_ERROR(
+          this->get_logger(),
+          "SUPPRESSION BACKSTOP EXPIRED after %.1f s (limit %.1f s). Withdrawing the "
+          "relay permit despite nav/local/submerged still being set - local_guided_node "
+          "should have given up at its own deadman and did not. The relay opens now.",
+          held, max_link_loss_suppress_s_);
+      }
+      // Stays expired until the link returns or the request drops, so it cannot
+      // re-arm itself tick by tick.
+      return false;
+    }
+    return true;
   }
 
   Detent classify(uint16_t raw) const
@@ -276,8 +468,22 @@ private:
     return Detent::MID;
   }
 
-  void update_link_fsm(const rclcpp::Time & now, bool link, Detent detent)
+  void update_link_fsm(const rclcpp::Time & now, bool link, Detent detent, bool suppress)
   {
+    // A sanctioned submerged loss must not latch. The latch exists to stop the
+    // vehicle recovering by itself from an UNEXPLAINED loss and demanding an
+    // operator acknowledgement instead; a dive is explained. Re-stamping the
+    // loss time holds the LATCH_TIMEOUT_S clock at zero for the duration, so a
+    // normal dive surfaces into LOST_TRANSIENT and recovers after RECOVER_HOLD_S
+    // rather than needing an ESTOP-detent cycle after every run.
+    //
+    // This does not weaken the latch for a real fault: if suppression ends with
+    // the link still down - the backstop firing, the flag going stale, the
+    // mission aborting - the clock starts from that moment and latches as usual.
+    if (suppress) {
+      link_lost_at_ = now;
+    }
+
     // Continuous-healthy streak, for the "recover slow" debounce.
     if (link) {
       if (!link_good_since_) {
@@ -460,7 +666,7 @@ private:
     }
   }
 
-  void publish_permit(bool permitted, Detent detent)
+  void publish_permit(bool permitted, Detent detent, bool suppress)
   {
     std_msgs::msg::Bool msg;
     msg.data = permitted;
@@ -469,7 +675,13 @@ private:
     if (!have_permit_ || permitted != last_permit_) {
       have_permit_ = true;
       last_permit_ = permitted;
-      if (permitted) {
+      if (permitted && suppress) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Relay permit HELD by submerged suppression: link FSM = %s, switch = %s, and "
+          "nav/local/submerged says this is a dive.",
+          fsm_name(link_fsm_), detent_name(detent));
+      } else if (permitted) {
         RCLCPP_INFO(
           this->get_logger(),
           "Relay permit GRANTED: link FSM OK and switch at %s.", detent_name(detent));
@@ -482,14 +694,28 @@ private:
     }
   }
 
-  void publish_mode_request(const rclcpp::Time & now, Detent detent)
+  // While suppressed with the link down the detent is UNKNOWN, which would
+  // publish SAFE and unwind the whole mission: the monitor grants SAFE,
+  // local_guided_node leaves LOCAL_GUIDED, the mission stops and with it the
+  // submerged flag that was holding the relay closed. Holding the last live
+  // detent is what keeps that from eating itself. It is only ever a value read
+  // from a real frame.
+  //
+  // During the resurfacing bridge this is a no-op rather than a second
+  // behaviour: the link is up, so last_live_detent_ was refreshed from this
+  // very tick's frame and already equals detent.
+  void publish_mode_request(const rclcpp::Time & now, Detent detent, bool suppress)
   {
+    const Detent effective = suppress ? last_live_detent_ : detent;
+
     jit_msgs::msg::ModeRequest msg;
     msg.stamp = now;
-    msg.mode = detent_mode(detent);
+    msg.mode = detent_mode(effective);
     msg.source = jit_msgs::msg::ModeRequest::SOURCE_RC;
     mode_pub_->publish(msg);
 
+    // Log the detent actually read, not the held one - the raw truth about the
+    // switch stays visible in the log even while the request is being held.
     if (!have_detent_ || detent != last_detent_) {
       have_detent_ = true;
       last_detent_ = detent;
@@ -527,6 +753,18 @@ private:
   unsigned long reconnect_count_ {0};
   bool ack_estop_seen_ {false};
 
+  // --- Submerged link-loss suppression ---
+  // last_live_detent_ starts UNKNOWN, which maps to SAFE: suppression before
+  // any frame has ever been decoded therefore holds nothing useful, which is
+  // the right way round.
+  double submerged_timeout_s_ {0.5};
+  double max_link_loss_suppress_s_ {150.0};
+  bool submerged_ {false};
+  rclcpp::Time submerged_stamp_;
+  std::optional<rclcpp::Time> suppress_since_;
+  bool backstop_expired_ {false};
+  Detent last_live_detent_ {Detent::UNKNOWN};
+
   // --- Edge-logging state ---
   bool have_link_ok_ {false};
   bool last_link_ok_ {false};
@@ -541,6 +779,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr link_ok_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr permit_pub_;
   rclcpp::Publisher<jit_msgs::msg::ModeRequest>::SharedPtr mode_pub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr submerged_sub_;
 };
 
 int main(int argc, char * argv[])

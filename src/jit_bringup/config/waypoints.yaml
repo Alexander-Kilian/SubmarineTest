@@ -11,21 +11,80 @@
 #   x  metres East of the datum   (local ENU frame, NOT the vehicle's heading)
 #   y  metres North of the datum
 #   z  OPTIONAL. Metres Up from the depth at mode entry - negative is deeper.
-#      Omit it to hold the entry depth, which is the default and what you want
-#      for surface work: the vehicle then does not fight the trim changes it
-#      sees during testing.
+#
+# z IS STICKY. Omitting z holds the depth commanded by the PREVIOUS waypoint,
+# not the entry depth. So a dive waypoint followed by translation waypoints
+# with no z of their own stays at the dive depth for the whole run, and only a
+# waypoint that states z again changes it. Omitting z on every waypoint holds
+# the entry depth for the whole mission, which is what you want for surface
+# work: the vehicle then does not fight the trim changes seen during testing.
+#
+# ACCEPTANCE DEPENDS ON WHETHER THE LEG CHANGES DEPTH. A leg whose commanded
+# depth differs from the previous leg's must satisfy depth_radius_m vertically
+# as well as radius_m horizontally. A level leg is judged horizontally only, as
+# it always has been. This is not cosmetic: a dive waypoint sits directly below
+# the datum, so its horizontal distance is ~0 before the vehicle has moved, and
+# a horizontal-only test would declare it reached on the first tick and finish
+# the mission without ever descending.
 #
 # Re-entering LOCAL_GUIDED recaptures the datum and restarts at index 0, so the
 # re-run gesture is a single switch cycle (ch8 UP -> MID -> UP).
+#
+# ---------------------------------------------------------------------------
+# SUBMERGED MISSIONS RELAX THE RC FAILSAFE - READ BEFORE UNCOMMENTING A DIVE
+# ---------------------------------------------------------------------------
+# Any commanded or measured depth more than submerge_threshold_m below the
+# entry depth makes local_guided_node assert nav/local/submerged. While that
+# flag is set AND the RC link is down:
+#
+#   - crsf_channel_node holds crsf/relay_permit true, so the motor rail stays
+#     live with the transmitter out of contact;
+#   - system_monitor_node does not raise RC_LINK_LOST;
+#   - the granted mode is held, so the mission keeps running.
+#
+# THE OPERATOR HAS NO STOP FOR THE WHOLE SUBMERGED PORTION. The switch is out
+# of range. What still stops the vehicle is: max_submerged_s (the deadman in
+# local_guided_node), max_link_loss_suppress_s (the independent backstop in
+# crsf_channel_node), MAVROS_LOST, the death of any safety process, and the
+# mission completing. That is the entire list.
+#
+# Set max_submerged_s from the dive you actually intend to fly plus a margin,
+# not generously - it is the main thing bounding an uncommandable vehicle.
+#
+# STRUCTURE DIVES AND TRANSLATIONS SEPARATELY. A waypoint either changes depth
+# or translates, never both. Acceptance, the yaw-along-track bearing and the
+# depth-leg test are all better conditioned that way.
 
 waypoints:
-  # First test: one waypoint, two metres out, holding the entry depth.
+  # Surface test: one waypoint, two metres East, holding the entry depth.
+  # No z anywhere, so nav/local/submerged is never asserted and the RC failsafe
+  # behaves exactly as it always has.
   - {x: 2.0, y: 0.0}
 
-  # --- The link-cut test -------------------------------------------------
-  # Uncomment to run it. A deliberately deep waypoint submerges the antenna,
-  # which drops the RC link, which opens the relay in hardware and floats the
-  # sub back up. The thing under test is what happens NEXT: when the link
-  # returns and the relay re-closes, the vehicle must NOT dive back down. That
-  # only holds if the disarm and the GUIDED exit both completed.
+  # --- First submerged test: straight down and back up ---------------------
+  # Uncomment this block AND comment out the surface waypoint above. Check
+  # max_submerged_s in jit_params.yaml first - this run should need well under
+  # a minute, so there is no reason to leave the deadman at a large default.
+  #
+  # - {x: 0.0, y: 0.0, z: -2.0}   # dive 2 m, no translation. DEPTH LEG.
+  # - {x: 0.0, y: 0.0, z:  0.0}   # return to the entry depth. DEPTH LEG.
+  #
+  # Expected: the sub descends, the RC link drops as the antenna goes under,
+  # the relay STAYS CLOSED, the mission holds LOCAL_GUIDED, the sub returns to
+  # the surface, the link comes back and suppression ends. The link FSM should
+  # go OK -> LOST_TRANSIENT -> OK without latching, because suppression holds
+  # the latch timer off for the duration of a sanctioned loss.
+
+  # --- Submerged translation, once the dive above is proven ----------------
+  # - {x: 0.0, y: 0.0, z: -2.0}   # dive.            DEPTH LEG
+  # - {x: 2.0, y: 0.0}            # translate at -2 m. z is STICKY - level leg
+  # - {x: 2.0, y: 0.0, z:  0.0}   # rise.            DEPTH LEG
+
+  # --- The old deliberate link-cut test ------------------------------------
+  # This no longer does what it used to. A deep waypoint now asserts
+  # nav/local/submerged, which is precisely what stops the link loss from
+  # opening the relay. To run the original test - link drops, relay opens, sub
+  # floats up, and the thing under test is that it does NOT dive again when the
+  # link returns - raise submerge_threshold_m above the dive depth so the flag
+  # never asserts, and use:
   # - {x: 2.0, y: 2.0, z: -3.0}

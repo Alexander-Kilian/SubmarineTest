@@ -16,7 +16,6 @@
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>mavros_msgs</depend>
-  <depend>geographic_msgs</depend>
   <depend>jit_msgs</depend>
   <depend>yaml-cpp</depend>
 

@@ -52,6 +52,39 @@
 // What this node explicitly does NOT do is re-run the link latch. That lives in
 // crsf_channel_node, next to the relay it gates. This node's use of link_ok is
 // only for the software gate and for fault reporting.
+//
+// ---------------------------------------------------------------------------
+// SUBMERGED OPERATION - SUPPRESSING RC_LINK_LOST, AND NOTHING ELSE
+// ---------------------------------------------------------------------------
+// Submerging the antenna drops the RC link. RC_LINK_LOST is inside
+// FAULT_SAFE_MASK, so on its own that drops sys/health_ok, opens the relay and
+// forces the granted mode to SAFE - which also ends the mission that wanted to
+// be submerged in the first place.
+//
+// So while nav/local/submerged is true and fresh AND the granted mode is
+// LOCAL_GUIDED, this node does not raise RC_LINK_LOST. That is the entire
+// extent of it. Everything else is untouched, and the two exclusions that
+// matter are worth naming:
+//
+//   CRSF_NODE_DEAD is NEVER suppressed. It comes from the ARRIVAL TIME of
+//   crsf/link_ok, not its value, so it means that process died. A dead CRSF
+//   node opens the relay whether the vehicle is submerged or not - which is
+//   also what makes suppression safe to grant, since the thing being trusted
+//   to keep asking is still being watched.
+//
+//   MAVROS_LOST and the relay faults are never suppressed either. Underwater,
+//   MAVROS_LOST is the main remaining automatic stop.
+//
+// The mode guard is deliberate and one-way: once a fault-safe fault has forced
+// SAFE, suppression cannot come back without a new mission. There is no race at
+// the instant of link loss, because faults are computed from the PREVIOUS
+// tick's granted_mode_ before arbitrate_mode() runs - the tick that first sees
+// the link down still sees LOCAL_GUIDED and suppresses.
+//
+// crsf_channel_node applies its own, independent suppression to the relay
+// permit with its own backstop timer. Neither node relies on the other: both
+// permits have to be held for the relay to stay closed, so a failure of either
+// suppression opens it.
 
 #include <chrono>
 #include <cstdint>
@@ -119,6 +152,10 @@ public:
     // MISSION_COMPLETE fault is raised and the vehicle mission-safes.
     hold_timeout_s_ = this->declare_parameter<double>("hold_timeout_s", 5.0);
 
+    // How stale nav/local/submerged may be and still suppress RC_LINK_LOST.
+    // Short, so that a dead local_guided_node re-arms the failsafe promptly.
+    submerged_timeout_s_ = this->declare_parameter<double>("submerged_timeout_s", 0.5);
+
     // --- Rates ---
     evaluate_hz_ = this->declare_parameter<double>("evaluate_hz", 10.0);
     safety_hz_ = this->declare_parameter<double>("safety_hz", 20.0);
@@ -143,6 +180,7 @@ public:
 
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
     link_ok_stamp_ = estop_stamp_ = mavros_stamp_ = mode_req_stamp_ = last_eval_ = t0;
+    submerged_stamp_ = t0;
 
     // --- Callback groups -----------------------------------------------------
     // The safety timer is alone in its group so it cannot be blocked by the
@@ -187,6 +225,15 @@ public:
     nav_global_sub_ = this->create_subscription<std_msgs::msg::String>(
       "nav/global/status", 10,
       [this](const std_msgs::msg::String::SharedPtr m) {nav_global_ = m->data;}, sub_opts);
+
+    // Published every tick by local_guided_node whatever its state, so silence
+    // here means that process died - and an absent flag suppresses nothing.
+    submerged_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+      "nav/local/submerged", 10,
+      [this](const std_msgs::msg::Bool::SharedPtr m) {
+        submerged_ = m->data;
+        submerged_stamp_ = this->now();
+      }, sub_opts);
 
     // --- Timers ---
     evaluate_timer_ = this->create_wall_timer(
@@ -268,16 +315,43 @@ private:
     const rclcpp::Time now = this->now();
     uint32_t faults = 0;
 
+    // --- Submerged: the one thing that relaxes a fault in this node ---
+    // Guarded on the granted mode, so a relaxation is only ever available to a
+    // running local guided mission. See the header for why there is no race
+    // here: granted_mode_ still holds the previous tick's value at this point,
+    // which is exactly what makes the first tick of a link loss suppress.
+    const bool submerged_fresh = fresh(submerged_stamp_, submerged_timeout_s_);
+    const bool suppress_link_loss =
+      submerged_ && submerged_fresh && granted_mode_ == Mode::LOCAL_GUIDED;
+
     // --- RC link and the CRSF node's liveness ---
     const bool link_fresh = fresh(link_ok_stamp_, crsf_heartbeat_timeout_s_);
     if (!link_fresh) {
+      // NEVER suppressed. This is the CRSF process's heartbeat, not the radio
+      // link, and it is in FAULT_SAFE_MASK: if the node that is supposed to be
+      // asking for suppression dies, the relay opens regardless.
       faults |= Health::CRSF_NODE_DEAD;
     }
     if (!have_link_ok_ || !link_fresh || !link_ok_value_) {
       // A stale topic counts as a lost link too: we cannot claim the link is up
       // on the strength of a value nobody has refreshed.
-      if (link_loss_action_ == "DISARM") {
+      if (link_loss_action_ == "DISARM" && !suppress_link_loss) {
         faults |= Health::RC_LINK_LOST;
+      }
+    }
+
+    if (suppress_link_loss != prev_suppress_link_loss_) {
+      prev_suppress_link_loss_ = suppress_link_loss;
+      if (suppress_link_loss) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "SUBMERGED: RC_LINK_LOST is now SUPPRESSED - losing the RC link will no longer "
+          "drop sys/health_ok or force SAFE. CRSF_NODE_DEAD, MAVROS_LOST, "
+          "ESTOP_NODE_DEAD and the relay faults are all still live.");
+      } else {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "RC_LINK_LOST suppression ENDED - normal link-loss faulting restored.");
       }
     }
 
@@ -339,6 +413,12 @@ private:
     h.faults = faults;
     h.ok = (faults == 0);
     h.detail = describe(faults);
+    if (suppress_link_loss) {
+      // Carried in the detail rather than as a fault bit: nothing should act on
+      // it, but anyone reading jit/health - live or from a log after a dive -
+      // needs to know the link-loss fault was being held off at the time.
+      h.detail += " [submerged: RC_LINK_LOST suppressed]";
+    }
     health_pub_->publish(h);
 
     if (faults != prev_faults_) {
@@ -460,6 +540,7 @@ private:
   double mavros_timeout_s_ {3.0};
   double mode_request_timeout_s_ {0.5};
   double hold_timeout_s_ {5.0};
+  double submerged_timeout_s_ {0.5};
   double evaluate_hz_ {10.0};
   double safety_hz_ {20.0};
   std::string link_loss_action_ {"DISARM"};
@@ -485,6 +566,10 @@ private:
   std::string nav_local_ {"IDLE"};
   std::string nav_global_ {"IDLE"};
 
+  bool submerged_ {false};
+  rclcpp::Time submerged_stamp_;
+  bool prev_suppress_link_loss_ {false};
+
   // --- Derived state ---
   uint32_t faults_ {0};
   uint32_t prev_faults_ {0xFFFFFFFFu};   // force a log on the first evaluation
@@ -507,6 +592,7 @@ private:
   rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_local_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_global_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr submerged_sub_;
   rclcpp::TimerBase::SharedPtr evaluate_timer_;
   rclcpp::TimerBase::SharedPtr safety_timer_;
 };

@@ -45,12 +45,74 @@
 //
 // z defaults to entry_z - the vehicle holds the depth it started at, so it does
 // not fight the trim changes seen during testing. A waypoint may override it
-// with its own `z`, which is also an offset (negative = deeper, ENU). That
-// override is how the deliberate link-cut test is expressed.
+// with its own `z`, which is also an offset (negative = deeper, ENU).
+//
+// THE DEPTH OVERRIDE IS STICKY. Once a waypoint sets z, every later waypoint
+// that omits z holds THAT depth, not entry_z. Without this, the intended
+// mission structure - one dive waypoint followed by level translation
+// waypoints - would command the sub back to the surface on the first
+// translation leg, because those legs carry no z of their own. z_offset_for()
+// is the single definition: walk the list to the index and take the last
+// override seen. It is a pure function of the index, so there is no sticky
+// state to get out of sync with a waypoint advance.
 //
 // Heading points along track: the bearing from the current position to the
-// target. Within yaw_hold_radius_m of the target the bearing becomes noisy, so
-// the last heading is held instead.
+// target. It is not an input - no waypoint carries an orientation - and it is
+// never used to decide whether a target is new. vehicle_interface_node forwards
+// on a position change alone, so the bearing that actually reaches the vehicle
+// is always the one sampled at a waypoint advance, with the new target a full
+// leg away. A value that is never sent from close in needs no close-in guard.
+//
+// ---------------------------------------------------------------------------
+// ACCEPTANCE AND THE VERTICAL AXIS
+// ---------------------------------------------------------------------------
+// The horizontal test above is not sufficient on its own for a leg that
+// changes depth. A waypoint directly below the datum has a horizontal distance
+// of ~0 from the instant the mission starts, so a horizontal-only test latches
+// "reached" immediately, dwells, and completes the mission without the vehicle
+// ever descending.
+//
+// So the vertical axis is checked too, but ONLY on a leg that actually commands
+// a depth change (see leg_changes_depth). On a level leg the depth error is
+// ignored exactly as before, which matters because holding entry_z on the
+// surface carries a persistent trim error that would otherwise block every
+// acceptance forever.
+//
+// ---------------------------------------------------------------------------
+// nav/local/submerged - RELAXING THE RC LINK-LOSS FAILSAFE
+// ---------------------------------------------------------------------------
+// Submerging the vehicle submerges the ELRS antenna, which drops the RC link.
+// Normally that is a fault: crsf_channel_node withdraws the relay permit and
+// system_monitor_node raises RC_LINK_LOST, which is inside FAULT_SAFE_MASK.
+// Both open the motor relay, so the vehicle cannot complete a submerged
+// mission under power.
+//
+// This node therefore publishes nav/local/submerged: a statement of fact -
+// "the mission is currently below the surface" - not a command. Two consumers
+// decide policy from it, and each applies its own freshness check:
+//
+//   crsf_channel_node    holds crsf/relay_permit true and holds mode/request
+//                        at the last live detent, but ONLY while the link is
+//                        actually down. A live link means the operator's ESTOP
+//                        detent works normally.
+//   system_monitor_node  does not raise RC_LINK_LOST. CRSF_NODE_DEAD,
+//                        MAVROS_LOST and ESTOP_NODE_DEAD are untouched.
+//
+// PUBLISH-ALWAYS, like crsf/link_ok. The flag goes out on every tick whatever
+// the state, so silence on this topic means this process died - at which point
+// both consumers time out within submerged_timeout_s and the failsafe re-arms.
+//
+// WHILE SUBMERGED THERE IS NO OPERATOR STOP. The switch is unreachable. What
+// still stops the vehicle is: this node's max_submerged_s deadman, the
+// independent backstop timer inside crsf_channel_node, MAVROS_LOST, the death
+// of any of the three safety processes, and the mission completing. That is
+// the whole list, and it is why the deadman is not optional.
+//
+// The flag is derived from the COMMANDED depth or the MEASURED depth, not from
+// "the current waypoint has a z". Commanded, because it must be asserted before
+// the descent begins rather than after the antenna is already under. Measured,
+// because an ascent leg commands a shallow depth while the vehicle is still
+// deep, and dropping the flag there would cut the motor rail halfway up.
 //
 // ---------------------------------------------------------------------------
 // RE-ENTRY
@@ -88,8 +150,14 @@ struct Waypoint
   double x {0.0};        // offset East from the datum, metres
   double y {0.0};        // offset North from the datum, metres
   double z {0.0};        // offset Up from entry_z, metres (negative = deeper)
-  bool has_z {false};    // false -> hold entry_z
+  bool has_z {false};    // false -> hold the depth of the previous leg
 };
+
+// Two commanded depths closer than this are the same depth, so the leg between
+// them is a level leg and its acceptance test stays horizontal-only. Not a
+// parameter: it distinguishes "this leg changes depth" from floating-point
+// noise, and has nothing to do with how accurately a depth must be held.
+constexpr double kDepthLegEpsilon = 1e-3;
 }  // namespace
 
 class LocalGuidedNode : public rclcpp::Node
@@ -104,7 +172,23 @@ public:
     setpoint_rate_hz_ = this->declare_parameter<double>("setpoint_rate_hz", 10.0);
     pose_timeout_s_ = this->declare_parameter<double>("pose_timeout_s", 1.0);
     bus_timeout_s_ = this->declare_parameter<double>("bus_timeout_s", 0.5);
-    yaw_hold_radius_m_ = this->declare_parameter<double>("yaw_hold_radius_m", 0.5);
+
+    // Vertical acceptance, applied only on a leg that commands a depth change.
+    depth_radius_m_ = this->declare_parameter<double>("depth_radius_m", 0.3);
+
+    // How far below the entry depth counts as submerged, for nav/local/submerged.
+    // Asserting it early is free - the flag does nothing unless the RC link is
+    // actually down - so this wants to be shallower than the depth at which the
+    // antenna goes under, not deeper.
+    submerge_threshold_m_ = this->declare_parameter<double>("submerge_threshold_m", 0.2);
+
+    // DEADMAN. The longest this node will keep asserting nav/local/submerged in
+    // one continuous stretch. While that flag is asserted and the link is down
+    // the operator has no stop, so this timer is the primary bound on the whole
+    // behaviour. On expiry the flag drops and the mission ABORTs, which cuts the
+    // setpoints, re-arms the RC failsafe and lets the vehicle float up.
+    // 0 disables the deadman - do not do that on a real dive.
+    max_submerged_s_ = this->declare_parameter<double>("max_submerged_s", 120.0);
 
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
     pose_stamp_ = mode_stamp_ = t0;
@@ -114,6 +198,11 @@ public:
     setpoint_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
       "cmd/local_guided/setpoint", 10);
     status_pub_ = this->create_publisher<std_msgs::msg::String>("nav/local/status", 10);
+
+    // Publish-always: goes out every tick whatever the state, so that silence
+    // on this topic means this process died rather than "not submerged". Both
+    // consumers re-arm the RC failsafe on staleness. See the header.
+    submerged_pub_ = this->create_publisher<std_msgs::msg::Bool>("nav/local/submerged", 10);
 
     rclcpp::QoS latched(1);
     latched.reliable();
@@ -142,9 +231,27 @@ public:
 
     RCLCPP_INFO(
       this->get_logger(),
-      "local_guided_node up. %zu waypoint(s) from '%s'. Acceptance: %.2f m then %.2f s "
-      "dwell. Setpoints at %.0f Hz.",
-      waypoints_.size(), waypoint_file_.c_str(), radius_m_, dwell_s_, setpoint_rate_hz_);
+      "local_guided_node up. %zu waypoint(s) from '%s'. Acceptance: %.2f m horizontal "
+      "(plus %.2f m vertical on a depth-changing leg) then %.2f s dwell. Setpoints at "
+      "%.0f Hz.",
+      waypoints_.size(), waypoint_file_.c_str(), radius_m_, depth_radius_m_, dwell_s_,
+      setpoint_rate_hz_);
+
+    if (max_submerged_s_ > 0.0) {
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Submerged flag on nav/local/submerged below %.2f m from the entry depth. "
+        "DEADMAN %.0f s: the RC link-loss failsafe is relaxed for at most that long in "
+        "one stretch, then the mission ABORTs.",
+        submerge_threshold_m_, max_submerged_s_);
+    } else {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "max_submerged_s is 0 - the submerged DEADMAN IS DISABLED. The RC link-loss "
+        "failsafe can then be held off indefinitely by this node, and while it is held "
+        "off the operator has no stop. Only crsf_channel_node's independent backstop "
+        "timer still bounds it. Do not dive like this.");
+    }
   }
 
 private:
@@ -167,8 +274,12 @@ private:
   // own plain YAML file loaded by path:
   //
   //   waypoints:
-  //     - {x: 2.0, y: 0.0}            # holds entry depth
-  //     - {x: 2.0, y: 2.0, z: -3.0}   # 3 m below the entry depth
+  //     - {x: 0.0, y: 0.0, z: -2.0}   # dive 2 m, no translation
+  //     - {x: 2.0, y: 0.0}            # translate at -2.0 m - z is STICKY
+  //     - {x: 2.0, y: 0.0, z:  0.0}   # rise back to the entry depth
+  //
+  // The omitted z on the second entry holds the depth commanded by the first,
+  // NOT the entry depth. See z_offset_for().
   //
   void load_waypoints()
   {
@@ -196,12 +307,18 @@ private:
           wp.has_z = true;
         }
         waypoints_.push_back(wp);
-        const std::string z_desc = wp.has_z
-          ? (std::to_string(wp.z) + " (override)")
-          : std::string("entry depth");
+      }
+
+      // Logged in a second pass so each line can show the effective depth that
+      // z_offset_for() will resolve, which is what the vehicle actually flies -
+      // not the raw field, which is absent on every inherited-depth leg.
+      for (size_t i = 0; i < waypoints_.size(); ++i) {
+        const double z = z_offset_for(i);
         RCLCPP_INFO(
-          this->get_logger(), "  wp[%zu]  x=%+.2f  y=%+.2f  z=%s",
-          waypoints_.size() - 1, wp.x, wp.y, z_desc.c_str());
+          this->get_logger(), "  wp[%zu]  x=%+.2f  y=%+.2f  z=%+.2f  %s%s",
+          i, waypoints_[i].x, waypoints_[i].y, z,
+          waypoints_[i].has_z ? "(override)" : "(inherited)",
+          leg_changes_depth(i) ? "  DEPTH LEG - vertical acceptance applies" : "");
       }
     } catch (const std::exception & e) {
       RCLCPP_ERROR(
@@ -217,6 +334,35 @@ private:
       return false;
     }
     return (this->now() - stamp).seconds() <= max_age_s;
+  }
+
+  // ---- Sticky depth --------------------------------------------------------
+  //
+  // The commanded depth of a leg, as an offset from entry_z: the last `z`
+  // override at or before this index, or 0.0 (the entry depth) if none.
+  //
+  // Deliberately a pure function of the index rather than a member updated at
+  // each advance. The mission's depth is then a property of the waypoint list
+  // and cannot drift out of sync with index_ through a re-entry, an abort or a
+  // mid-mission state change.
+  double z_offset_for(size_t idx) const
+  {
+    double z = 0.0;
+    for (size_t i = 0; i < waypoints_.size() && i <= idx; ++i) {
+      if (waypoints_[i].has_z) {
+        z = waypoints_[i].z;
+      }
+    }
+    return z;
+  }
+
+  // True when this leg commands a depth change - the dive and rise legs. Only
+  // these apply the vertical acceptance test; a level leg ignores depth error
+  // exactly as this node always has. See the header.
+  bool leg_changes_depth(size_t idx) const
+  {
+    const double prev = (idx == 0) ? 0.0 : z_offset_for(idx - 1);
+    return std::fabs(z_offset_for(idx) - prev) > kDepthLegEpsilon;
   }
 
   // ---- Mode transitions ----------------------------------------------------
@@ -238,7 +384,6 @@ private:
     entry_z_ = pose_.pose.position.z;
     index_ = 0;
     reached_flag_ = false;
-    have_last_yaw_ = false;
     set_state(State::RUNNING, "datum captured");
 
     RCLCPP_INFO(
@@ -284,21 +429,26 @@ private:
     sp.header.frame_id = "map";
     sp.pose.position.x = datum_.x + wp.x;
     sp.pose.position.y = datum_.y + wp.y;
-    sp.pose.position.z = wp.has_z ? (entry_z_ + wp.z) : entry_z_;
+    // Sticky: a leg with no z of its own holds the last commanded depth, not
+    // the entry depth. See z_offset_for().
+    sp.pose.position.z = entry_z_ + z_offset_for(index_);
 
-    // Point along track. Close in, the bearing is dominated by estimator noise,
-    // so hold whatever heading we last commanded.
+    // Point along track: the bearing from where we are to the target.
+    //
+    // Recomputed every tick, but only the value present when
+    // vehicle_interface_node forwards a target ever reaches ArduSub, and it
+    // forwards on a position change alone. Position here is datum + offset, so
+    // it is fixed for the whole leg and moves only at a waypoint advance - at
+    // which moment the sub is sitting in the previous waypoint's acceptance
+    // ball with the new target a full leg away, where the bearing is well
+    // conditioned. The noisy close-in bearing is computed and then discarded.
     const double dx = sp.pose.position.x - pose_.pose.position.x;
     const double dy = sp.pose.position.y - pose_.pose.position.y;
-    const double planar = std::hypot(dx, dy);
-    if (planar >= yaw_hold_radius_m_ || !have_last_yaw_) {
-      last_yaw_ = std::atan2(dy, dx);   // ENU: CCW from East
-      have_last_yaw_ = true;
-    }
+    const double yaw = std::atan2(dy, dx);   // ENU: CCW from East
     sp.pose.orientation.x = 0.0;
     sp.pose.orientation.y = 0.0;
-    sp.pose.orientation.z = std::sin(last_yaw_ * 0.5);
-    sp.pose.orientation.w = std::cos(last_yaw_ * 0.5);
+    sp.pose.orientation.z = std::sin(yaw * 0.5);
+    sp.pose.orientation.w = std::cos(yaw * 0.5);
     return sp;
   }
 
@@ -311,19 +461,48 @@ private:
 
   // Mirrors ArduPilot's verify_nav_wp(): latch on first touch, then run the
   // dwell clock without re-checking distance.
+  //
+  // The vertical term is the one addition. It applies only on a depth-changing
+  // leg, because a dive waypoint sits directly below the datum and its
+  // horizontal distance is ~0 before the vehicle has moved at all: a
+  // horizontal-only test would latch "reached" on the first tick and complete
+  // the mission without ever descending. On a level leg the depth error is
+  // ignored as before, so a persistent surface trim error still cannot block
+  // an acceptance.
   void check_reached(const rclcpp::Time & now, const geometry_msgs::msg::PoseStamped & target)
   {
     const double d = horizontal_distance(target);
     last_distance_ = d;
 
     if (!reached_flag_) {
-      if (d <= radius_m_) {
+      const double dz = target.pose.position.z - pose_.pose.position.z;
+      const bool depth_leg = leg_changes_depth(index_);
+      const bool depth_ok = !depth_leg || std::fabs(dz) <= depth_radius_m_;
+
+      if (d <= radius_m_ && depth_ok) {
         reached_flag_ = true;
         reached_at_ = now;
-        RCLCPP_INFO(
-          this->get_logger(),
-          "Waypoint %zu reached (%.2f m <= %.2f m). Dwelling %.2f s.",
-          index_, d, radius_m_, dwell_s_);
+        if (depth_leg) {
+          RCLCPP_INFO(
+            this->get_logger(),
+            "Waypoint %zu reached (%.2f m <= %.2f m horizontal, %.2f m <= %.2f m "
+            "vertical). Dwelling %.2f s.",
+            index_, d, radius_m_, std::fabs(dz), depth_radius_m_, dwell_s_);
+        } else {
+          RCLCPP_INFO(
+            this->get_logger(),
+            "Waypoint %zu reached (%.2f m <= %.2f m horizontal; level leg, depth error "
+            "%.2f m ignored). Dwelling %.2f s.",
+            index_, d, radius_m_, std::fabs(dz), dwell_s_);
+        }
+      } else if (depth_leg && d <= radius_m_) {
+        // Horizontally there but still descending or ascending. Worth seeing:
+        // on a dive leg this is the normal state for the whole descent, and if
+        // it never clears the vehicle cannot make depth.
+        RCLCPP_INFO_THROTTLE(
+          this->get_logger(), *this->get_clock(), 3000,
+          "Waypoint %zu: horizontal ok, depth error %.2f m (need %.2f m). Still on the "
+          "depth leg.", index_, std::fabs(dz), depth_radius_m_);
       }
       return;
     }
@@ -338,7 +517,6 @@ private:
     reached_flag_ = false;
     if (index_ + 1 < waypoints_.size()) {
       ++index_;
-      have_last_yaw_ = false;
       RCLCPP_INFO(this->get_logger(), "Advancing to waypoint %zu.", index_);
       return;
     }
@@ -346,6 +524,74 @@ private:
     // system_monitor_node starts the hold_timeout_s clock that leads to
     // mission-safe.
     set_state(State::COMPLETE, "final waypoint reached; holding station");
+  }
+
+  // ---- The submerged flag --------------------------------------------------
+  //
+  // Decides what goes out on nav/local/submerged this tick, and runs the
+  // deadman. See the header for what the flag does and why it is bounded.
+  //
+  // Only a live mission may assert it. IDLE, ABORTED and an inactive mode all
+  // clear it, so a mission that stops for any reason also re-arms the RC
+  // failsafe rather than leaving it relaxed.
+  void update_submerged(const rclcpp::Time & now)
+  {
+    bool want = false;
+    const char * why = "";
+
+    if (state_ == State::RUNNING || state_ == State::COMPLETE) {
+      // Commanded: asserted the instant a dive leg becomes current, which is
+      // before the vehicle has descended and therefore before the antenna goes
+      // under. That ordering is the point - the flag has to be live and fresh
+      // at both consumers before the link actually drops.
+      const bool cmd_deep = z_offset_for(index_) < -submerge_threshold_m_;
+
+      // Measured: keeps the flag asserted through an ascent leg, which commands
+      // a shallow depth while the vehicle is still deep. Without it the flag
+      // would drop at the start of the ascent and the motor rail would be cut
+      // halfway up. Requires a fresh pose - an unknown depth is not a reason to
+      // keep the failsafe relaxed.
+      const bool meas_deep = fresh(pose_stamp_, pose_timeout_s_) &&
+        (pose_.pose.position.z - entry_z_) < -submerge_threshold_m_;
+
+      want = cmd_deep || meas_deep;
+      why = cmd_deep ? (meas_deep ? "commanded and measured" : "commanded") : "measured";
+    }
+
+    if (want) {
+      if (!submerged_since_) {
+        submerged_since_ = now;
+        RCLCPP_WARN(
+          this->get_logger(),
+          "SUBMERGED (%s, threshold %.2f m) - asserting nav/local/submerged. The RC "
+          "link-loss failsafe is now relaxed: if the link drops, the relay stays closed "
+          "and the mode is held. There is no operator stop until this clears. Deadman "
+          "%.0f s.",
+          why, submerge_threshold_m_, max_submerged_s_);
+      }
+
+      const double held = (now - *submerged_since_).seconds();
+      if (max_submerged_s_ > 0.0 && held >= max_submerged_s_) {
+        want = false;
+        RCLCPP_ERROR(
+          this->get_logger(),
+          "SUBMERGED DEADMAN EXPIRED after %.1f s (limit %.1f s). Dropping "
+          "nav/local/submerged and aborting: the RC link-loss failsafe re-arms, and if "
+          "the link is still down the relay opens and the vehicle floats up.",
+          held, max_submerged_s_);
+        set_state(State::ABORTED, "submerged deadman expired");
+      }
+    }
+
+    if (!want && submerged_since_) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "No longer submerged after %.1f s - nav/local/submerged cleared, RC link-loss "
+        "failsafe re-armed.", (now - *submerged_since_).seconds());
+      submerged_since_.reset();
+    }
+
+    submerged_ = want;
   }
 
   // ---- Main loop -----------------------------------------------------------
@@ -362,15 +608,24 @@ private:
     }
     was_active_ = mode_active;
 
+    // Before the early returns, and before the setpoint goes out: this can
+    // ABORT on the deadman, and when it does, the checks below must see the
+    // new state so no further setpoint is published this tick.
+    update_submerged(now);
+
     if (!mode_active || (state_ != State::RUNNING && state_ != State::COMPLETE)) {
-      publish_status();
+      publish_outputs();
       return;
     }
 
     // A mission cannot continue without a position estimate.
     if (!fresh(pose_stamp_, pose_timeout_s_)) {
       set_state(State::ABORTED, "/mavros/local_position/pose went stale mid-mission");
-      publish_status();
+      // Re-derive: the abort just happened, and an aborted mission must not
+      // publish a submerged flag that keeps the RC failsafe relaxed for even
+      // one more tick.
+      update_submerged(now);
+      publish_outputs();
       return;
     }
 
@@ -389,14 +644,20 @@ private:
     // fresh setpoint to exist before it will arm, so waiting for ready here
     // would deadlock the two nodes against each other.
     setpoint_pub_->publish(target);
-    publish_status();
+    publish_outputs();
   }
 
-  void publish_status()
+  // Both status topics, on every tick and every return path out of tick().
+  // nav/local/submerged is publish-always by contract - see the header.
+  void publish_outputs()
   {
-    std_msgs::msg::String msg;
-    msg.data = state_name(state_);
-    status_pub_->publish(msg);
+    std_msgs::msg::String status;
+    status.data = state_name(state_);
+    status_pub_->publish(status);
+
+    std_msgs::msg::Bool submerged;
+    submerged.data = submerged_;
+    submerged_pub_->publish(submerged);
   }
 
   // --- Config ---
@@ -406,7 +667,9 @@ private:
   double setpoint_rate_hz_ {10.0};
   double pose_timeout_s_ {1.0};
   double bus_timeout_s_ {0.5};
-  double yaw_hold_radius_m_ {0.5};
+  double depth_radius_m_ {0.3};
+  double submerge_threshold_m_ {0.2};
+  double max_submerged_s_ {120.0};
   std::vector<Waypoint> waypoints_;
 
   // --- Inputs ---
@@ -425,12 +688,17 @@ private:
   bool reached_flag_ {false};
   rclcpp::Time reached_at_;
   double last_distance_ {0.0};
-  double last_yaw_ {0.0};
-  bool have_last_yaw_ {false};
+
+  // --- Submerged flag ---
+  // submerged_since_ is the deadman clock: set when the flag first asserts,
+  // cleared when it drops. Not a duration counter - one continuous stretch.
+  bool submerged_ {false};
+  std::optional<rclcpp::Time> submerged_since_;
 
   // --- ROS interfaces ---
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr setpoint_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr submerged_pub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
   rclcpp::Subscription<Mode>::SharedPtr mode_sub_;
   rclcpp::TimerBase::SharedPtr timer_;

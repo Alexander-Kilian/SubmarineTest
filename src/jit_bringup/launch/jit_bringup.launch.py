@@ -73,43 +73,16 @@ def generate_launch_description():
         default_value="true",
         description="Run the welded-relay check at startup. Only disable on the bench.",
     )
-    arg_vehicle_exe = DeclareLaunchArgument(
-        "vehicle_interface_exe",
-        default_value="vehicle_interface_node",
-        description=(
-            "Which vehicle-interface variant to run. These are three transports for "
-            "the same guided waypoints, being compared in the water:\n"
-            "  vehicle_interface_node          A - setpoint_position/local\n"
-            "  vehicle_interface_raw_node      B - setpoint_raw/local, explicit type_mask\n"
-            "  vehicle_interface_mission_node  C - mission/push + AUTO\n"
-            "Prefer the bringup_a/b/c wrappers, which also set the matching params."
-        ),
-    )
-    arg_stream_mode = DeclareLaunchArgument(
-        "stream_mode",
-        default_value="dedupe",
-        description=(
-            "Guided setpoint pacing for variants A and B. 'dedupe' forwards a target "
-            "only when it moves; 'continuous' forwards every tick at send_rate_hz, "
-            "which is the PX4-derived 'at least 2 Hz, typically 20 Hz' advice. This is "
-            "the core experiment, so it is a launch argument rather than only a "
-            "params-file entry. A launch argument BEATS jit_params.yaml. Ignored by "
-            "variant C, which uploads a mission instead of streaming."
-        ),
-    )
-
     params = LaunchConfiguration("params_file")
     waypoints = LaunchConfiguration("waypoint_file")
-    vehicle_exe = LaunchConfiguration("vehicle_interface_exe")
-    stream_mode = LaunchConfiguration("stream_mode")
     control_on = IfCondition(LaunchConfiguration("enable_control"))
 
-    def node(pkg, exe, extra_params=None, name=None, **kw):
+    def node(pkg, exe, extra_params=None, **kw):
         param_list = [params]
         if extra_params:
             param_list.append(extra_params)
         return Node(
-            package=pkg, executable=exe, name=name if name is not None else exe,
+            package=pkg, executable=exe, name=exe,
             parameters=param_list, output="screen", **kw
         )
 
@@ -142,17 +115,8 @@ def generate_launch_description():
     led_node = node("jit_ui", "led_driver_node", respawn=True, respawn_delay=RESPAWN_DELAY_S)
 
     # --- Control stack ------------------------------------------------------
-    # The variant is chosen by argument. The node name follows the executable so
-    # that the per-node blocks in jit_params.yaml still key correctly.
-    #
-    # waypoint_file is passed here as well as to local_guided_node: variant C
-    # builds its mission from the same file. Variants A and B never declare that
-    # parameter, and an override for a parameter a node does not declare is
-    # simply unused - the same mechanism that lets one params file serve every
-    # node in this launch.
     vehicle_node = node(
-        "jit_control", vehicle_exe, name=vehicle_exe,
-        extra_params={"waypoint_file": waypoints, "stream_mode": stream_mode},
+        "jit_control", "vehicle_interface_node",
         respawn=True, respawn_delay=RESPAWN_DELAY_S, condition=control_on,
     )
     manual_node = node(
@@ -204,8 +168,6 @@ def generate_launch_description():
         arg_waypoints,
         arg_control,
         arg_selftest,
-        arg_vehicle_exe,
-        arg_stream_mode,
         LogInfo(msg="[bringup] starting the JIT stack - health gate does the sequencing"),
         abort_on_estop_failure,
         crsf_node,

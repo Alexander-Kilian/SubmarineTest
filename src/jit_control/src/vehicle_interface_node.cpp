@@ -126,36 +126,15 @@ public:
 
     // --- Guided setpoint dedupe (see forward_active_command) ---
     // A guided position target is a ONE-SHOT command to ArduSub, not a stream.
-    // Only forward one when it actually changes by more than these thresholds.
+    // Only forward one when the target position actually moves by more than
+    // this. Position alone decides - see setpoint_is_new().
     setpoint_epsilon_m_ = this->declare_parameter<double>("setpoint_epsilon_m", 0.05);
-    setpoint_yaw_epsilon_rad_ =
-      this->declare_parameter<double>("setpoint_yaw_epsilon_rad", 0.02);
     // Each new target is sent this many times, this far apart, then we go quiet.
     // The repeats cover MAVLink loss over the BlueOS router; they are close
     // enough together that the s-curve reset they cause is irrelevant.
     setpoint_burst_count_ = this->declare_parameter<int>("setpoint_burst_count", 5);
     setpoint_burst_interval_s_ =
       this->declare_parameter<double>("setpoint_burst_interval_s", 0.05);
-
-    // --- Field experiment knob ---
-    // "dedupe"     forward a guided target only when it moves (the default, and
-    //              the behaviour the s-curve analysis above argues for).
-    // "continuous" forward every tick at send_rate_hz, which is what the widely
-    //              quoted "minimum 2 Hz, typical 20 Hz" advice prescribes. That
-    //              advice is PX4 OFFBOARD guidance - PX4 drops out of offboard
-    //              without a >2 Hz stream - and ArduPilot GUIDED has no such
-    //              requirement for POSITION targets (GUID_TIMEOUT covers only
-    //              attitude, velocity and acceleration). This knob exists so the
-    //              two can be compared on one binary in the water rather than
-    //              argued about from documentation.
-    stream_mode_ = this->declare_parameter<std::string>("stream_mode", "dedupe");
-    if (stream_mode_ != "dedupe" && stream_mode_ != "continuous") {
-      RCLCPP_WARN(
-        this->get_logger(),
-        "stream_mode '%s' is not recognised; falling back to 'dedupe'.",
-        stream_mode_.c_str());
-      stream_mode_ = "dedupe";
-    }
 
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
     health_stamp_ = mode_stamp_ = mavros_stamp_ = t0;
@@ -223,10 +202,10 @@ public:
     RCLCPP_INFO(
       this->get_logger(),
       "vehicle_interface_node up. MANUAL -> ArduSub '%s', guided -> '%s', safing -> '%s'. "
-      "Loop %.0f Hz. Guided transport: setpoint_position/local, stream_mode '%s'. "
+      "Loop %.0f Hz. Guided targets go out on setpoint_position/local, deduped. "
       "Disarm retries at %.1f Hz until /mavros/state confirms, minimum %d commands.",
       manual_ardusub_mode_.c_str(), guided_ardusub_mode_.c_str(), safing_mode_.c_str(),
-      send_rate_hz_, stream_mode_.c_str(), disarm_retry_hz_, min_disarm_commands_);
+      send_rate_hz_, disarm_retry_hz_, min_disarm_commands_);
   }
 
 private:
@@ -469,11 +448,23 @@ private:
   }
 
   // Yaw about Z from a yaw-only quaternion, as the guided nodes build them.
+  // Used only to log what heading went out with a target; the change test below
+  // deliberately ignores yaw.
   static double yaw_of(const geometry_msgs::msg::PoseStamped & p)
   {
     return 2.0 * std::atan2(p.pose.orientation.z, p.pose.orientation.w);
   }
 
+  // POSITION ONLY, deliberately.
+  //
+  // A waypoint carries no orientation (see local_guided_node's Waypoint), so
+  // the yaw on a setpoint is not an input at all - it is synthesised from the
+  // live pose as the bearing to the target. Comparing it here meant estimator
+  // noise could declare a target "new" that had not moved, and every false
+  // trigger is another AC_WPNav::set_wp_destination() re-anchoring the leg and
+  // restarting the s-curve. Position catches every real change on its own:
+  // consecutive waypoints are metres apart, and mode exit, disarm or safing
+  // clear have_sent_sp_ outright rather than relying on any threshold.
   bool setpoint_is_new(const geometry_msgs::msg::PoseStamped & sp) const
   {
     if (!have_sent_sp_) {
@@ -481,16 +472,9 @@ private:
     }
     const auto & a = sp.pose.position;
     const auto & b = last_sent_sp_.pose.position;
-    if (std::fabs(a.x - b.x) > setpoint_epsilon_m_ ||
-      std::fabs(a.y - b.y) > setpoint_epsilon_m_ ||
-      std::fabs(a.z - b.z) > setpoint_epsilon_m_)
-    {
-      return true;
-    }
-    double dyaw = yaw_of(sp) - yaw_of(last_sent_sp_);
-    while (dyaw > M_PI) {dyaw -= 2.0 * M_PI;}
-    while (dyaw < -M_PI) {dyaw += 2.0 * M_PI;}
-    return std::fabs(dyaw) > setpoint_yaw_epsilon_rad_;
+    return std::fabs(a.x - b.x) > setpoint_epsilon_m_ ||
+           std::fabs(a.y - b.y) > setpoint_epsilon_m_ ||
+           std::fabs(a.z - b.z) > setpoint_epsilon_m_;
   }
 
   // MANUAL_CONTROL is a stream and must be sent every tick. A guided position
@@ -521,18 +505,6 @@ private:
     }
 
     auto sp = (granted_mode_ == Mode::LOCAL_GUIDED) ? local_cmd_ : global_cmd_;
-
-    // Experiment arm: stream every tick, ignoring the dedupe entirely. This is
-    // the behaviour that was observed to stop the vehicle accelerating; it is
-    // kept selectable so that result can be reproduced deliberately rather than
-    // taken on trust.
-    if (stream_mode_ == "continuous") {
-      sp.header.stamp = now;
-      setpoint_pub_->publish(sp);
-      last_sent_sp_ = sp;
-      have_sent_sp_ = true;
-      return;
-    }
 
     if (setpoint_is_new(sp)) {
       sp_burst_remaining_ = std::max(1, setpoint_burst_count_);
@@ -645,10 +617,8 @@ private:
   double arm_stick_epsilon_ {60.0};
   double z_neutral_ {500.0};
   double setpoint_epsilon_m_ {0.05};
-  double setpoint_yaw_epsilon_rad_ {0.02};
   int setpoint_burst_count_ {5};
   double setpoint_burst_interval_s_ {0.05};
-  std::string stream_mode_ {"dedupe"};
 
   // --- Bus ---
   bool have_health_ {false};
