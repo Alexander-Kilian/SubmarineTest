@@ -95,7 +95,7 @@ public:
     const int gpio_pin = this->declare_parameter<int>("gpio_pin", 13);
     const int pwm_channel = this->declare_parameter<int>("pwm_channel", 1);
     const int dma_channel = this->declare_parameter<int>("dma_channel", 10);
-    const int led_count = this->declare_parameter<int>("led_count", 8);
+    const int led_count = this->declare_parameter<int>("led_count", 256);
     const int freq_hz = this->declare_parameter<int>("freq_hz", 800000);
     const int brightness = this->declare_parameter<int>("brightness", 255);
     const bool invert = this->declare_parameter<bool>("invert", false);
