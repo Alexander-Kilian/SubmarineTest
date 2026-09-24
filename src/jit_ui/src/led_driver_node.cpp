@@ -97,7 +97,7 @@ public:
     const int dma_channel = this->declare_parameter<int>("dma_channel", 10);
     const int led_count = this->declare_parameter<int>("led_count", 256);
     const int freq_hz = this->declare_parameter<int>("freq_hz", 800000);
-    const int brightness = this->declare_parameter<int>("brightness", 255);
+    const int brightness = this->declare_parameter<int>("brightness", 64);
     const bool invert = this->declare_parameter<bool>("invert", false);
     const std::string strip_type_str =
       this->declare_parameter<std::string>("strip_type", "GRB");
