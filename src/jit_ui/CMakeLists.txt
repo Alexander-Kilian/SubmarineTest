@@ -29,6 +29,9 @@ target_link_libraries(led_driver_node ${WS2811_LIBRARY} Threads::Threads)
 
 install(TARGETS led_driver_node DESTINATION lib/${PROJECT_NAME})
 
+# UDP-only Fast DDS profile for the root-run LED node - see the file header.
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)

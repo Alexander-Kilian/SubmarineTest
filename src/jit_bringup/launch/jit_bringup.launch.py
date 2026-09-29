@@ -31,7 +31,10 @@ rpi_ws281x needs root for the panel's PWM/DMA hardware (/dev/vcio, /dev/mem).
 Before any node starts, the launch runs ``sudo -v`` - this is the password
 prompt - and then starts ``led_driver_node`` alone under ``sudo -n``. sudo
 wipes the environment, LD_LIBRARY_PATH included, so the variables the node
-needs are handed across explicitly through ``env``. If sudo fails (wrong
+needs are handed across explicitly through ``env``. The node is also pinned to
+a UDP-only Fast DDS profile (jit_ui/config/udp_only.xml): shared memory cannot
+carry data between a root process and user processes, so without it the node
+discovers led/command but never receives a sample. If sudo fails (wrong
 password, no terminal) the LED node is skipped and the rest of the stack runs
 normally: the panel is indication only and holds no safety policy.
 
@@ -49,6 +52,7 @@ import os
 import shlex
 import subprocess
 
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -175,6 +179,9 @@ def generate_launch_description():
         # first start and respawns inside sudo's timeout; outside it, sudo
         # fails loudly instead of hanging on a prompt buried in node output.
         forwarded = ["{}={}".format(k, os.environ[k]) for k in ROOT_ENV_KEEP if k in os.environ]
+        # Last on the env line, so it wins over any profile forwarded above.
+        udp_profile = os.path.join(get_package_share_directory("jit_ui"), "config", "udp_only.xml")
+        forwarded.append("FASTRTPS_DEFAULT_PROFILES_FILE={}".format(udp_profile))
         prefix = " ".join(shlex.quote(a) for a in ["sudo", "-n", "/usr/bin/env", *forwarded])
         return [node("jit_ui", "led_driver_node", prefix=prefix, **kw)]
 
