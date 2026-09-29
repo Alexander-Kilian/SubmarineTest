@@ -25,18 +25,36 @@ fault behind a wall of restarts.
 Set ``boot_selftest:=false`` for bench work where the relay or the feedback LDO
 is not connected.
 
+THE LED DRIVER RUNS AS ROOT
+---------------------------
+rpi_ws281x needs root for the panel's PWM/DMA hardware (/dev/vcio, /dev/mem).
+Before any node starts, the launch runs ``sudo -v`` - this is the password
+prompt - and then starts ``led_driver_node`` alone under ``sudo -n``. sudo
+wipes the environment, LD_LIBRARY_PATH included, so the variables the node
+needs are handed across explicitly through ``env``. If sudo fails (wrong
+password, no terminal) the LED node is skipped and the rest of the stack runs
+normally: the panel is indication only and holds no safety policy.
+
+Set ``led_as_root:=false`` to start it as the current user instead.
+
 Usage:
     ros2 launch jit_bringup jit_bringup.launch.py
     ros2 launch jit_bringup jit_bringup.launch.py enable_control:=false
     ros2 launch jit_bringup jit_bringup.launch.py boot_selftest:=false
     ros2 launch jit_bringup jit_bringup.launch.py params_file:=/path/to/my.yaml
+    ros2 launch jit_bringup jit_bringup.launch.py led_as_root:=false
 """
+
+import os
+import shlex
+import subprocess
 
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     EmitEvent,
     LogInfo,
+    OpaqueFunction,
     RegisterEventHandler,
 )
 from launch.conditions import IfCondition
@@ -48,6 +66,20 @@ from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 RESPAWN_DELAY_S = 2.0
+
+# Carried across sudo to the root-run led_driver_node. sudo resets the
+# environment and always strips LD_LIBRARY_PATH, without which the node cannot
+# find the ROS libraries; the DDS variables keep it on the same ROS graph.
+ROOT_ENV_KEEP = (
+    "LD_LIBRARY_PATH",
+    "AMENT_PREFIX_PATH",
+    "ROS_DOMAIN_ID",
+    "ROS_LOCALHOST_ONLY",
+    "RMW_IMPLEMENTATION",
+    "FASTRTPS_DEFAULT_PROFILES_FILE",
+    "CYCLONEDDS_URI",
+    "ROS_LOG_DIR",
+)
 
 
 def generate_launch_description():
@@ -72,6 +104,11 @@ def generate_launch_description():
         "boot_selftest",
         default_value="true",
         description="Run the welded-relay check at startup. Only disable on the bench.",
+    )
+    arg_led_root = DeclareLaunchArgument(
+        "led_as_root",
+        default_value="true",
+        description="Start led_driver_node through sudo (asks for the password once).",
     )
     params = LaunchConfiguration("params_file")
     waypoints = LaunchConfiguration("waypoint_file")
@@ -112,7 +149,36 @@ def generate_launch_description():
     )
 
     # --- Indication ---------------------------------------------------------
-    led_node = node("jit_ui", "led_driver_node", respawn=True, respawn_delay=RESPAWN_DELAY_S)
+    def led_driver(context):
+        """Start led_driver_node, through sudo unless led_as_root is false.
+
+        Runs as an OpaqueFunction placed ahead of every node, so the password
+        prompt appears on a quiet terminal before anything else has started.
+        """
+        kw = dict(respawn=True, respawn_delay=RESPAWN_DELAY_S)
+        as_root = LaunchConfiguration("led_as_root").perform(context).lower()
+        if as_root not in ("true", "1", "yes"):
+            return [node("jit_ui", "led_driver_node", **kw)]
+
+        print(
+            "[bringup] led_driver_node needs root for the LED panel "
+            "(rpi_ws281x PWM/DMA) - sudo may ask for your password.",
+            flush=True,
+        )
+        if subprocess.run(["sudo", "-v"]).returncode != 0:
+            return [LogInfo(
+                msg="[bringup] sudo failed - led_driver_node NOT started, the panel "
+                    "stays dark. The rest of the stack is unaffected."
+            )]
+
+        # -n: never prompt. The credentials cached by sudo -v above cover the
+        # first start and respawns inside sudo's timeout; outside it, sudo
+        # fails loudly instead of hanging on a prompt buried in node output.
+        forwarded = ["{}={}".format(k, os.environ[k]) for k in ROOT_ENV_KEEP if k in os.environ]
+        prefix = " ".join(shlex.quote(a) for a in ["sudo", "-n", "/usr/bin/env", *forwarded])
+        return [node("jit_ui", "led_driver_node", prefix=prefix, **kw)]
+
+    led_node = OpaqueFunction(function=led_driver)
 
     # --- Control stack ------------------------------------------------------
     vehicle_node = node(
@@ -168,12 +234,14 @@ def generate_launch_description():
         arg_waypoints,
         arg_control,
         arg_selftest,
+        arg_led_root,
+        # First, so the sudo prompt comes before any node output.
+        led_node,
         LogInfo(msg="[bringup] starting the JIT stack - health gate does the sequencing"),
         abort_on_estop_failure,
         crsf_node,
         gpio_node,
         monitor_node,
-        led_node,
         vehicle_node,
         manual_node,
         local_node,
