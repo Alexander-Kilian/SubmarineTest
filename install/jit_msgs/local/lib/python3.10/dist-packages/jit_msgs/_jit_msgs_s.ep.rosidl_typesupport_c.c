@@ -1,1 +1,0 @@
-/home/zanslayer/SubmarineTest/build/jit_msgs/rosidl_generator_py/jit_msgs/_jit_msgs_s.ep.rosidl_typesupport_c.c

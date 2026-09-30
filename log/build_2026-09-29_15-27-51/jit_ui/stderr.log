@@ -1,4 +1,0 @@
-CMake Error at CMakeLists.txt:21 (find_library):
-  Could not find WS2811_LIBRARY using the following names: ws2811
-
-

@@ -1,1 +1,0 @@
-/home/zanslayer/SubmarineTest/build/jit_msgs/rosidl_typesupport_fastrtps_c/jit_msgs/msg/detail/health__rosidl_typesupport_fastrtps_c.h
