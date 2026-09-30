@@ -1,0 +1,132 @@
+In file included from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device.h:5,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device.cpp:1:
+/home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/message/ping-parser.h:73:20: warning: ‘const char* PINGPARSER_STATE_TO_STRING(PingParser::State)’ defined but not used [-Wunused-function]
+   73 | static const char* PINGPARSER_STATE_TO_STRING(PingParser::State state) {
+      |                    ^~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device.h:5,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device-ping360.h:13,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device-ping360.cpp:3:
+/home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/message/ping-parser.h:73:20: warning: ‘const char* PINGPARSER_STATE_TO_STRING(PingParser::State)’ defined but not used [-Wunused-function]
+   73 | static const char* PINGPARSER_STATE_TO_STRING(PingParser::State state) {
+      |                    ^~~~~~~~~~~~~~~~~~~~~~~~~~
+cc1plus: note: unrecognized command-line option ‘-Wno-unused-variable -Wno-unused-function -Wno-error’ may have been intended to silence earlier diagnostics
+cc1plus: note: unrecognized command-line option ‘-Wno-unused-variable -Wno-unused-function -Wno-error’ may have been intended to silence earlier diagnostics
+/home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.cpp:37:2: warning: #warning is a GCC extension
+   37 | #warning "Move match strings to string_view and concatenate it with regex string inside the named regex match"
+      |  ^~~~~~~
+/home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.cpp:37:2: warning: #warning "Move match strings to string_view and concatenate it with regex string inside the named regex match" [-Wcpp]
+In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+                 from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+                 from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+                 from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+                 from /usr/include/boost/shared_ptr.hpp:17,
+                 from /usr/include/boost/date_time/time_clock.hpp:17,
+                 from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+                 from /usr/include/boost/asio/time_traits.hpp:23,
+                 from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+                 from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+                 from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+                 from /usr/include/boost/asio.hpp:25,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.cpp:7:
+/usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+   36 | BOOST_PRAGMA_MESSAGE(
+      | ^~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+                 from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+                 from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+                 from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+                 from /usr/include/boost/shared_ptr.hpp:17,
+                 from /usr/include/boost/date_time/time_clock.hpp:17,
+                 from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+                 from /usr/include/boost/asio/time_traits.hpp:23,
+                 from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+                 from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+                 from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+                 from /usr/include/boost/asio.hpp:25,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/udp-link.h:6,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/udp-link.cpp:6:
+/usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+   36 | BOOST_PRAGMA_MESSAGE(
+      | ^~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+                 from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+                 from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+                 from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+                 from /usr/include/boost/shared_ptr.hpp:17,
+                 from /usr/include/boost/signals2/deconstruct.hpp:28,
+                 from /usr/include/boost/signals2.hpp:15,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.h:6,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.cpp:1:
+/usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+   36 | BOOST_PRAGMA_MESSAGE(
+      | ^~~~~~~~~~~~~~~~~~~~
+cc1plus: note: unrecognized command-line option ‘-Wno-unused-variable -Wno-unused-function -Wno-error’ may have been intended to silence earlier diagnostics
+In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+                 from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+                 from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+                 from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+                 from /usr/include/boost/shared_ptr.hpp:17,
+                 from /usr/include/boost/date_time/time_clock.hpp:17,
+                 from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+                 from /usr/include/boost/asio/time_traits.hpp:23,
+                 from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+                 from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+                 from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+                 from /usr/include/boost/asio.hpp:25,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/sonar_interface.h:4,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/sonar_interface.cpp:1:
+/usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+   36 | BOOST_PRAGMA_MESSAGE(
+      | ^~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+                 from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+                 from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+                 from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+                 from /usr/include/boost/shared_ptr.hpp:17,
+                 from /usr/include/boost/date_time/time_clock.hpp:17,
+                 from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+                 from /usr/include/boost/asio/time_traits.hpp:23,
+                 from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+                 from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+                 from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+                 from /usr/include/boost/asio.hpp:25,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/sonar_interface.h:4,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/ping360_node.h:12,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping360_node.cpp:2:
+/usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+   36 | BOOST_PRAGMA_MESSAGE(
+      | ^~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+                 from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+                 from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+                 from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+                 from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+                 from /usr/include/boost/shared_ptr.hpp:17,
+                 from /usr/include/boost/date_time/time_clock.hpp:17,
+                 from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+                 from /usr/include/boost/asio/time_traits.hpp:23,
+                 from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+                 from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+                 from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+                 from /usr/include/boost/asio.hpp:25,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/sonar_interface.h:4,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/ping360_node.h:12,
+                 from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping360.cpp:1:
+/usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+   36 | BOOST_PRAGMA_MESSAGE(
+      | ^~~~~~~~~~~~~~~~~~~~

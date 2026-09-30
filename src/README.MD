@@ -9,6 +9,7 @@ Packages:
 | `jit_control` | `vehicle_interface_node`, `manual_control_node`, `local_guided_node`, `global_guided_node` |
 | `jit_ui` | `led_driver_node` |
 | `jit_bringup` | launch files and config only, no source |
+| `ping360_sonar`, `ping360_sonar_msgs` | upstream Ping360 driver, a **git submodule** at `src/ping360_sonar` |
 
 This builds on the **companion Pi**, not on a dev machine — `jit_safety` needs
 two system libraries that only exist on the vehicle (below).
@@ -127,6 +128,49 @@ directly because ROS 2 parameters cannot express a list of maps.
 sudo apt install libyaml-cpp-dev -y
 ```
 
+### ping360_sonar — Ping360 scanning sonar
+
+<https://github.com/CentraleNantesRobotics/ping360_sonar> (`ros2` branch)
+
+Checked in as a git submodule at `src/ping360_sonar`, which itself contains a
+submodule (`ping-cpp`). Clone this repo with `--recursive`, and after a pull
+that moves the submodule, run:
+
+```bash
+git submodule update --init --recursive
+```
+
+An empty `src/ping360_sonar/` means this step was skipped.
+
+We run the **C++** node, `ping360_node`. Its dependencies:
+
+```bash
+sudo apt install libboost-atomic-dev libboost-program-options-dev \
+     libboost-system-dev libboost-thread-dev \
+     ros-humble-image-transport ros-humble-image-transport-plugins
+# serial access to /dev/ttyUSB0 - log out and back in afterwards
+sudo usermod -aG dialout $USER
+```
+
+> **`colcon.meta` turns the C++ node on.** Upstream's CMakeLists has
+> `option(COMPILE_CPP ON)`, which CMake reads as a help string of `ON` with
+> the option **defaulting to OFF**. Without the repo-root `colcon.meta` only
+> the Python node is built, and that one needs the pip-only `bluerobotics-ping`.
+> colcon only picks up `colcon.meta` from the directory you build in, so build
+> from `~/SubmarineTest`. Check: `ls install/ping360_sonar/lib/ping360_sonar/ping360_node`.
+
+> **`fallback_emulated: false` is deliberate.** Upstream defaults it to `true`,
+> which publishes random emulated data whenever the sonar cannot be opened.
+> Here the node exits with `Cannot initialize sonar`, and the launch respawns
+> it until the sonar appears.
+
+Topics, under `sonar/`: `scan_image` (`sensor_msgs/Image`, plus
+`/compressed`), `scan` (`sensor_msgs/LaserScan`, once per sweep), and
+`scan_echo` (`ping360_sonar_msgs/SonarEcho`). `scan` and `scan_echo` are only
+published while something is subscribed. The node pings every 120 ms, so a
+full 360° sweep at `angle_step: 1` takes about 48 s. Narrow `angle_sector` or
+raise `angle_step` for faster updates.
+
 ### ROS 2 packages
 
 `rclcpp`, `std_msgs`, `geometry_msgs`, `sensor_msgs`, `mavros_msgs`.
@@ -169,6 +213,7 @@ Useful arguments:
 | `boot_selftest` | `true` | `false` skips the welded-relay check — bench only |
 | `params_file` | package config | override the parameter file |
 | `waypoint_file` | package config | override the mission file |
+| `enable_sonar` | `true` | `false` leaves out the Ping360 driver |
 
 MAVROS must be running separately:
 
@@ -190,3 +235,4 @@ MAVLink layer and then silently ignored.
 | relay feedback | BCM18 / header 12 | input | 3.3 V LDO on the switched rail. HIGH = rail live |
 | CRSF receiver | `/dev/ttyAMA0` | RX only | one-way: the Pi's UART TX is not wired to the Rx |
 | LED panel data | BCM13 / header 33 | output | PWM channel 1. Single-wire addressable panel (rpi_ws281x) |
+| Ping360 sonar | USB, `/dev/ttyUSB0` | serial | BLU/USB adapter, 115200 baud. Set in `jit_params.yaml` |

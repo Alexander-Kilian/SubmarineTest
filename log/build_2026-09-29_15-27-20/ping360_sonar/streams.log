@@ -1,0 +1,231 @@
+[0.010s] Invoking command in '/home/zanslayer/SubmarineTest/build/ping360_sonar': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar -DCOMPILE_CPP=ON -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/zanslayer/SubmarineTest/install/ping360_sonar
+[0.054s] -- The C compiler identification is GNU 11.4.0
+[0.101s] -- The CXX compiler identification is GNU 11.4.0
+[0.109s] -- Detecting C compiler ABI info
+[0.161s] -- Detecting C compiler ABI info - done
+[0.169s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.169s] -- Detecting C compile features
+[0.169s] -- Detecting C compile features - done
+[0.172s] -- Detecting CXX compiler ABI info
+[0.233s] -- Detecting CXX compiler ABI info - done
+[0.240s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.240s] -- Detecting CXX compile features
+[0.240s] -- Detecting CXX compile features - done
+[0.242s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.382s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.438s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.466s] -- Found rclcpp: 16.0.21 (/opt/ros/humble/share/rclcpp/cmake)
+[0.502s] -- Found rosidl_generator_c: 3.1.9 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.506s] -- Found rosidl_adapter: 3.1.9 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.513s] -- Found rosidl_generator_cpp: 3.1.9 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.523s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.537s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.583s] -- Found rmw_implementation_cmake: 6.1.4 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.586s] -- Found rmw_fastrtps_cpp: 6.2.10 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[0.662s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.2")  
+[0.685s] -- Found FastRTPS: /opt/ros/humble/include  
+[0.717s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.727s] -- Looking for pthread.h
+[0.781s] -- Looking for pthread.h - found
+[0.781s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[0.842s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[0.843s] -- Found Threads: TRUE  
+[0.903s] -- Found sensor_msgs: 4.9.2 (/opt/ros/humble/share/sensor_msgs/cmake)
+[0.946s] -- Found ping360_sonar_msgs: 1.0.0 (/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/share/ping360_sonar_msgs/cmake)
+[0.960s] -- Found image_transport: 3.1.13 (/opt/ros/humble/share/image_transport/cmake)
+[1.021s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found suitable version "1.74.0", minimum required is "1.67") found components: atomic program_options system thread 
+[1.151s] -- Configuring done
+[1.170s] -- Generating done
+[1.176s] -- Build files have been written to: /home/zanslayer/SubmarineTest/build/ping360_sonar
+[1.186s] Invoked command in '/home/zanslayer/SubmarineTest/build/ping360_sonar' returned '0': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar -DCOMPILE_CPP=ON -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/zanslayer/SubmarineTest/install/ping360_sonar
+[1.187s] Invoking command in '/home/zanslayer/SubmarineTest/build/ping360_sonar': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/zanslayer/SubmarineTest/build/ping360_sonar -- -j8 -l8
+[1.231s] [ 16%] Building CXX object src/CMakeFiles/ping-cpp.dir/ping-cpp/src/hal/link/desktop/udp-link.cpp.o
+[1.231s] [ 16%] Building CXX object src/CMakeFiles/ping-cpp.dir/ping-cpp/src/hal/link/desktop/abstract-link.cpp.o
+[1.231s] [ 33%] Building CXX object src/CMakeFiles/ping-cpp.dir/ping-cpp/src/hal/time/desktop/ping-time.cpp.o
+[1.232s] [ 33%] Building CXX object src/CMakeFiles/ping-cpp.dir/ping-cpp/src/hal/link/desktop/serial-link.cpp.o
+[1.232s] [ 41%] Building CXX object src/CMakeFiles/ping-cpp.dir/ping-cpp/src/device/ping-device-ping360.cpp.o
+[1.235s] [ 50%] Building CXX object src/CMakeFiles/ping-cpp.dir/ping-cpp/src/device/ping-device.cpp.o
+[1.242s] [ 50%] Built target ament_cmake_python_symlink_ping360_sonar
+[1.290s] In file included from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device.h:5,
+[1.290s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device.cpp:1:
+[1.290s] /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/message/ping-parser.h:73:20: warning: ‘const char* PINGPARSER_STATE_TO_STRING(PingParser::State)’ defined but not used [-Wunused-function]
+[1.290s]    73 | static const char* PINGPARSER_STATE_TO_STRING(PingParser::State state) {
+[1.290s]       |                    ^~~~~~~~~~~~~~~~~~~~~~~~~~
+[1.306s] In file included from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device.h:5,
+[1.306s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device-ping360.h:13,
+[1.306s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/device/ping-device-ping360.cpp:3:
+[1.306s] /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/message/ping-parser.h:73:20: warning: ‘const char* PINGPARSER_STATE_TO_STRING(PingParser::State)’ defined but not used [-Wunused-function]
+[1.306s]    73 | static const char* PINGPARSER_STATE_TO_STRING(PingParser::State state) {
+[1.306s]       |                    ^~~~~~~~~~~~~~~~~~~~~~~~~~
+[1.317s] cc1plus: note: unrecognized command-line option ‘-Wno-unused-variable -Wno-unused-function -Wno-error’ may have been intended to silence earlier diagnostics
+[1.345s] cc1plus: note: unrecognized command-line option ‘-Wno-unused-variable -Wno-unused-function -Wno-error’ may have been intended to silence earlier diagnostics
+[1.715s] running egg_info
+[1.716s] creating ping360_sonar.egg-info
+[1.717s] writing ping360_sonar.egg-info/PKG-INFO
+[1.717s] writing dependency_links to ping360_sonar.egg-info/dependency_links.txt
+[1.718s] writing top-level names to ping360_sonar.egg-info/top_level.txt
+[1.721s] writing manifest file 'ping360_sonar.egg-info/SOURCES.txt'
+[1.723s] reading manifest file 'ping360_sonar.egg-info/SOURCES.txt'
+[1.724s] writing manifest file 'ping360_sonar.egg-info/SOURCES.txt'
+[1.766s] [ 50%] Built target ament_cmake_python_build_ping360_sonar_egg
+[2.940s] /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.cpp:37:2: warning: #warning is a GCC extension
+[2.941s]    37 | #warning "Move match strings to string_view and concatenate it with regex string inside the named regex match"
+[2.941s]       |  ^~~~~~~
+[2.941s] /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.cpp:37:2: warning: #warning "Move match strings to string_view and concatenate it with regex string inside the named regex match" [-Wcpp]
+[3.392s] In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+[3.392s]                  from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+[3.392s]                  from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+[3.392s]                  from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+[3.392s]                  from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+[3.393s]                  from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+[3.393s]                  from /usr/include/boost/shared_ptr.hpp:17,
+[3.393s]                  from /usr/include/boost/date_time/time_clock.hpp:17,
+[3.393s]                  from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+[3.393s]                  from /usr/include/boost/asio/time_traits.hpp:23,
+[3.393s]                  from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+[3.393s]                  from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+[3.393s]                  from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+[3.393s]                  from /usr/include/boost/asio.hpp:25,
+[3.393s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+[3.394s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.cpp:7:
+[3.394s] /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+[3.394s]    36 | BOOST_PRAGMA_MESSAGE(
+[3.394s]       | ^~~~~~~~~~~~~~~~~~~~
+[3.429s] In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+[3.429s]                  from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+[3.429s]                  from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+[3.429s]                  from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+[3.430s]                  from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+[3.430s]                  from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+[3.430s]                  from /usr/include/boost/shared_ptr.hpp:17,
+[3.430s]                  from /usr/include/boost/date_time/time_clock.hpp:17,
+[3.430s]                  from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+[3.430s]                  from /usr/include/boost/asio/time_traits.hpp:23,
+[3.430s]                  from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+[3.430s]                  from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+[3.430s]                  from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+[3.430s]                  from /usr/include/boost/asio.hpp:25,
+[3.431s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/udp-link.h:6,
+[3.431s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/udp-link.cpp:6:
+[3.431s] /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+[3.431s]    36 | BOOST_PRAGMA_MESSAGE(
+[3.431s]       | ^~~~~~~~~~~~~~~~~~~~
+[4.527s] In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+[4.528s]                  from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+[4.528s]                  from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+[4.528s]                  from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+[4.528s]                  from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+[4.528s]                  from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+[4.528s]                  from /usr/include/boost/shared_ptr.hpp:17,
+[4.528s]                  from /usr/include/boost/signals2/deconstruct.hpp:28,
+[4.528s]                  from /usr/include/boost/signals2.hpp:15,
+[4.528s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.h:6,
+[4.528s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/abstract-link.cpp:1:
+[4.529s] /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+[4.529s]    36 | BOOST_PRAGMA_MESSAGE(
+[4.529s]       | ^~~~~~~~~~~~~~~~~~~~
+[7.723s] cc1plus: note: unrecognized command-line option ‘-Wno-unused-variable -Wno-unused-function -Wno-error’ may have been intended to silence earlier diagnostics
+[7.996s] [ 58%] Linking CXX shared library libping-cpp.so
+[8.275s] [ 58%] Built target ping-cpp
+[8.292s] [ 75%] Building CXX object CMakeFiles/ping360_node.dir/src/sonar_interface.cpp.o
+[8.292s] [ 75%] Building CXX object CMakeFiles/ping360_node.dir/src/ping360.cpp.o
+[8.294s] [ 83%] Building CXX object CMakeFiles/ping360_node.dir/src/ping360_node.cpp.o
+[8.294s] [ 91%] Building CXX object CMakeFiles/ping360_node.dir/src/sector.cpp.o
+[10.325s] In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+[10.325s]                  from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+[10.325s]                  from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+[10.325s]                  from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+[10.326s]                  from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+[10.326s]                  from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+[10.326s]                  from /usr/include/boost/shared_ptr.hpp:17,
+[10.326s]                  from /usr/include/boost/date_time/time_clock.hpp:17,
+[10.326s]                  from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+[10.326s]                  from /usr/include/boost/asio/time_traits.hpp:23,
+[10.326s]                  from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+[10.326s]                  from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+[10.326s]                  from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+[10.326s]                  from /usr/include/boost/asio.hpp:25,
+[10.326s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+[10.327s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/sonar_interface.h:4,
+[10.327s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/sonar_interface.cpp:1:
+[10.327s] /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+[10.327s]    36 | BOOST_PRAGMA_MESSAGE(
+[10.327s]       | ^~~~~~~~~~~~~~~~~~~~
+[12.194s] In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+[12.194s]                  from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+[12.194s]                  from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+[12.194s]                  from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+[12.194s]                  from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+[12.194s]                  from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+[12.194s]                  from /usr/include/boost/shared_ptr.hpp:17,
+[12.194s]                  from /usr/include/boost/date_time/time_clock.hpp:17,
+[12.194s]                  from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+[12.194s]                  from /usr/include/boost/asio/time_traits.hpp:23,
+[12.194s]                  from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+[12.194s]                  from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+[12.195s]                  from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+[12.195s]                  from /usr/include/boost/asio.hpp:25,
+[12.195s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+[12.195s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/sonar_interface.h:4,
+[12.195s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/ping360_node.h:12,
+[12.195s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping360_node.cpp:2:
+[12.195s] /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+[12.195s]    36 | BOOST_PRAGMA_MESSAGE(
+[12.195s]       | ^~~~~~~~~~~~~~~~~~~~
+[12.274s] In file included from /usr/include/boost/smart_ptr/detail/sp_thread_sleep.hpp:22,
+[12.274s]                  from /usr/include/boost/smart_ptr/detail/yield_k.hpp:23,
+[12.274s]                  from /usr/include/boost/smart_ptr/detail/spinlock_gcc_atomic.hpp:14,
+[12.274s]                  from /usr/include/boost/smart_ptr/detail/spinlock.hpp:42,
+[12.274s]                  from /usr/include/boost/smart_ptr/detail/spinlock_pool.hpp:25,
+[12.274s]                  from /usr/include/boost/smart_ptr/shared_ptr.hpp:29,
+[12.274s]                  from /usr/include/boost/shared_ptr.hpp:17,
+[12.274s]                  from /usr/include/boost/date_time/time_clock.hpp:17,
+[12.274s]                  from /usr/include/boost/date_time/posix_time/posix_time_types.hpp:10,
+[12.274s]                  from /usr/include/boost/asio/time_traits.hpp:23,
+[12.274s]                  from /usr/include/boost/asio/detail/timer_queue_ptime.hpp:22,
+[12.274s]                  from /usr/include/boost/asio/detail/deadline_timer_service.hpp:29,
+[12.274s]                  from /usr/include/boost/asio/basic_deadline_timer.hpp:25,
+[12.274s]                  from /usr/include/boost/asio.hpp:25,
+[12.274s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping-cpp/src/hal/link/desktop/serial-link.h:10,
+[12.274s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/sonar_interface.h:4,
+[12.274s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/include/ping360_sonar/ping360_node.h:12,
+[12.274s]                  from /home/zanslayer/SubmarineTest/src/ping360_sonar/ping360_sonar/src/ping360.cpp:1:
+[12.274s] /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.’
+[12.275s]    36 | BOOST_PRAGMA_MESSAGE(
+[12.275s]       | ^~~~~~~~~~~~~~~~~~~~
+[15.229s] [100%] Linking CXX executable ping360_node
+[15.564s] [100%] Built target ping360_node
+[15.573s] Invoked command in '/home/zanslayer/SubmarineTest/build/ping360_sonar' returned '0': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/zanslayer/SubmarineTest/build/ping360_sonar -- -j8 -l8
+[15.575s] Invoking command in '/home/zanslayer/SubmarineTest/build/ping360_sonar': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/zanslayer/SubmarineTest/build/ping360_sonar
+[15.580s] -- Install configuration: ""
+[15.581s] -- Execute custom install script
+[15.581s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/lib/ping360_sonar/ping360_node
+[15.587s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/lib/libping-cpp.so
+[15.594s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/environment/pythonpath.sh
+[15.601s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/environment/pythonpath.dsv
+[15.608s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar-2.0.1-py3.10.egg-info/PKG-INFO
+[15.615s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar-2.0.1-py3.10.egg-info/SOURCES.txt
+[15.622s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar-2.0.1-py3.10.egg-info/dependency_links.txt
+[15.629s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar-2.0.1-py3.10.egg-info/top_level.txt
+[15.636s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar/__init__.py
+[15.642s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar/sonar_interface.py
+[15.649s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/lib/ping360_sonar/ping360.py
+[15.655s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ament_index/resource_index/package_run_dependencies/ping360_sonar
+[15.661s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ament_index/resource_index/parent_prefix_path/ping360_sonar
+[15.667s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/environment/ament_prefix_path.sh
+[15.673s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/environment/ament_prefix_path.dsv
+[15.680s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/environment/path.sh
+[15.688s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/environment/path.dsv
+[15.694s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/local_setup.bash
+[15.701s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/local_setup.sh
+[15.708s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/local_setup.zsh
+[15.715s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/local_setup.dsv
+[15.721s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/package.dsv
+[15.728s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ament_index/resource_index/packages/ping360_sonar
+[15.735s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/cmake/ping360_sonarConfig.cmake
+[15.743s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/cmake/ping360_sonarConfig-version.cmake
+[15.750s] -- Symlinking: /home/zanslayer/SubmarineTest/install/ping360_sonar/share/ping360_sonar/package.xml
+[15.792s] Listing '/home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar'...
+[15.792s] Compiling '/home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar/__init__.py'...
+[15.792s] Compiling '/home/zanslayer/SubmarineTest/install/ping360_sonar/local/lib/python3.10/dist-packages/ping360_sonar/sonar_interface.py'...
+[15.799s] Invoked command in '/home/zanslayer/SubmarineTest/build/ping360_sonar' returned '0': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/ping360_sonar_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/zanslayer/SubmarineTest/build/ping360_sonar

@@ -1,0 +1,43 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from jit_msgs/msg/EstopStatus.msg
+// generated code does not contain a copyright notice
+
+#include "builtin_interfaces/msg/Time.idl"
+
+module jit_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      "Relay state as reported by gpio_estop_node on estop/status." "\n"
+      "" "\n"
+      "Two independent facts, because they can disagree and the disagreement is the" "\n"
+      "most safety-relevant signal in the system:" "\n"
+      "" "\n"
+      "  commanded - what we drove the output pin to" "\n"
+      "  feedback  - what the LDO on the switched battery rail says is actually" "\n"
+      "              happening (HIGH = relay closed = rail live)" "\n"
+      "" "\n"
+      "Published with transient-local (\"latched\") QoS plus a heartbeat, so a late" "\n"
+      "subscriber gets the state immediately and a live one can apply a staleness" "\n"
+      "timeout.")
+    struct EstopStatus {
+      builtin_interfaces::msg::Time stamp;
+
+      @verbatim (language="comment", text=
+        "true = we asked for the rail to be live")
+      boolean commanded;
+
+      @verbatim (language="comment", text=
+        "true = the rail actually is live")
+      boolean feedback;
+
+      @verbatim (language="comment", text=
+        "true = settled and disagreeing (see relay_settle_ms)")
+      boolean mismatch;
+
+      @verbatim (language="comment", text=
+        "Set once the boot-time self-test has run. Before that, `mismatch` is not" "\n"
+        "meaningful because the relay has not had time to settle.")
+      boolean settled;
+    };
+  };
+};

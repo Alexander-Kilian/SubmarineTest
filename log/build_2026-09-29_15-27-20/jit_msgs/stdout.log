@@ -1,0 +1,310 @@
+-- The C compiler identification is GNU 11.4.0
+-- The CXX compiler identification is GNU 11.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+-- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+-- Override CMake install command with custom implementation using symlinks instead of copying resources
+-- Found builtin_interfaces: 1.2.3 (/opt/ros/humble/share/builtin_interfaces/cmake)
+-- Found rosidl_generator_c: 3.1.9 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+-- Found rosidl_adapter: 3.1.9 (/opt/ros/humble/share/rosidl_adapter/cmake)
+-- Found rosidl_generator_cpp: 3.1.9 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found rosidl_default_generators: 1.2.1 (/opt/ros/humble/share/rosidl_default_generators/cmake)
+-- Found ament_cmake_ros: 0.10.1 (/opt/ros/humble/share/ament_cmake_ros/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found PythonInterp: /usr/bin/python3 (found suitable version "3.10.12", minimum required is "3.6") 
+-- Found python_cmake_module: 0.10.0 (/opt/ros/humble/share/python_cmake_module/cmake)
+-- Found PythonLibs: /usr/lib/x86_64-linux-gnu/libpython3.10.so (found suitable version "3.10.12", minimum required is "3.5") 
+-- Using PYTHON_EXECUTABLE: /usr/bin/python3
+-- Using PYTHON_INCLUDE_DIRS: /usr/include/python3.10
+-- Using PYTHON_LIBRARIES: /usr/lib/x86_64-linux-gnu/libpython3.10.so
+-- Found PythonExtra: .so  
+-- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+-- Added test 'lint_cmake' to check CMake code style
+-- Added test 'xmllint' to check XML markup files
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/zanslayer/SubmarineTest/build/jit_msgs
+[  1%] Generating C code for ROS interfaces
+[  3%] Generating C++ code for ROS interfaces
+[  4%] Generating Rust code for ROS interfaces
+[  4%] Built target ament_cmake_python_symlink_jit_msgs
+running egg_info
+creating jit_msgs.egg-info
+writing jit_msgs.egg-info/PKG-INFO
+writing dependency_links to jit_msgs.egg-info/dependency_links.txt
+writing top-level names to jit_msgs.egg-info/top_level.txt
+writing manifest file 'jit_msgs.egg-info/SOURCES.txt'
+reading manifest file 'jit_msgs.egg-info/SOURCES.txt'
+writing manifest file 'jit_msgs.egg-info/SOURCES.txt'
+[  4%] Built target ament_cmake_python_build_jit_msgs_egg
+[  4%] Built target jit_msgs__rs
+[  4%] Built target jit_msgs__cpp
+[  6%] Generating C++ introspection for ROS interfaces
+[  7%] Generating C++ type support for eProsima Fast-RTPS
+[  9%] Generating C++ type support dispatch for ROS interfaces
+[ 10%] Building C object CMakeFiles/jit_msgs__rosidl_generator_c.dir/rosidl_generator_c/jit_msgs/msg/detail/health__functions.c.o
+[ 12%] Building C object CMakeFiles/jit_msgs__rosidl_generator_c.dir/rosidl_generator_c/jit_msgs/msg/detail/led_command__functions.c.o
+[ 14%] Building C object CMakeFiles/jit_msgs__rosidl_generator_c.dir/rosidl_generator_c/jit_msgs/msg/detail/mode__functions.c.o
+[ 17%] Building C object CMakeFiles/jit_msgs__rosidl_generator_c.dir/rosidl_generator_c/jit_msgs/msg/detail/mode_request__functions.c.o
+[ 17%] Building C object CMakeFiles/jit_msgs__rosidl_generator_c.dir/rosidl_generator_c/jit_msgs/msg/detail/estop_status__functions.c.o
+[ 18%] Linking C shared library libjit_msgs__rosidl_generator_c.so
+[ 18%] Built target jit_msgs__rosidl_generator_c
+[ 21%] Generating C type support for eProsima Fast-RTPS
+[ 21%] Generating C introspection for ROS interfaces
+[ 23%] Generating C type support dispatch for ROS interfaces
+[ 25%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/jit_msgs/msg/health__type_support.cpp.o
+[ 26%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/jit_msgs/msg/mode_request__type_support.cpp.o
+[ 28%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/jit_msgs/msg/mode__type_support.cpp.o
+[ 29%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/jit_msgs/msg/led_command__type_support.cpp.o
+[ 31%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/jit_msgs/msg/estop_status__type_support.cpp.o
+[ 32%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/jit_msgs/msg/detail/dds_fastrtps/health__type_support.cpp.o
+[ 34%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/jit_msgs/msg/detail/health__type_support.cpp.o
+[ 35%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/jit_msgs/msg/health__type_support.cpp.o
+[ 37%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/jit_msgs/msg/detail/dds_fastrtps/mode__type_support.cpp.o
+[ 39%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/jit_msgs/msg/mode__type_support.cpp.o
+[ 40%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/jit_msgs/msg/mode_request__type_support.cpp.o
+[ 42%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/jit_msgs/msg/led_command__type_support.cpp.o
+[ 43%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/jit_msgs/msg/estop_status__type_support.cpp.o
+[ 45%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/jit_msgs/msg/detail/health__type_support.c.o
+[ 46%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/jit_msgs/msg/detail/health__type_support_c.cpp.o
+[ 48%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/jit_msgs/msg/detail/mode__type_support.c.o
+[ 50%] Linking CXX shared library libjit_msgs__rosidl_typesupport_c.so
+[ 51%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/jit_msgs/msg/detail/mode_request__type_support.c.o
+[ 53%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/jit_msgs/msg/detail/mode__type_support_c.cpp.o
+[ 53%] Built target jit_msgs__rosidl_typesupport_c
+[ 54%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/jit_msgs/msg/detail/dds_fastrtps/mode_request__type_support.cpp.o
+[ 56%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/jit_msgs/msg/detail/led_command__type_support.c.o
+[ 57%] Linking CXX shared library libjit_msgs__rosidl_typesupport_cpp.so
+[ 57%] Built target jit_msgs__rosidl_typesupport_cpp
+[ 59%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/jit_msgs/msg/detail/estop_status__type_support.c.o
+[ 60%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/jit_msgs/msg/detail/dds_fastrtps/led_command__type_support.cpp.o
+[ 62%] Linking C shared library libjit_msgs__rosidl_typesupport_introspection_c.so
+[ 64%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/jit_msgs/msg/detail/dds_fastrtps/estop_status__type_support.cpp.o
+[ 65%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/jit_msgs/msg/detail/mode__type_support.cpp.o
+[ 65%] Built target jit_msgs__rosidl_typesupport_introspection_c
+[ 67%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/jit_msgs/msg/detail/mode_request__type_support_c.cpp.o
+[ 68%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/jit_msgs/msg/detail/led_command__type_support_c.cpp.o
+[ 70%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/jit_msgs/msg/detail/mode_request__type_support.cpp.o
+[ 71%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/jit_msgs/msg/detail/estop_status__type_support_c.cpp.o
+[ 73%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/jit_msgs/msg/detail/led_command__type_support.cpp.o
+[ 75%] Building CXX object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/jit_msgs/msg/detail/estop_status__type_support.cpp.o
+[ 76%] Linking CXX shared library libjit_msgs__rosidl_typesupport_fastrtps_cpp.so
+[ 76%] Built target jit_msgs__rosidl_typesupport_fastrtps_cpp
+[ 78%] Linking CXX shared library libjit_msgs__rosidl_typesupport_fastrtps_c.so
+[ 78%] Built target jit_msgs__rosidl_typesupport_fastrtps_c
+[ 79%] Linking CXX shared library libjit_msgs__rosidl_typesupport_introspection_cpp.so
+[ 79%] Built target jit_msgs__rosidl_typesupport_introspection_cpp
+[ 79%] Built target jit_msgs
+[ 81%] Generating Python code for ROS interfaces
+[ 81%] Built target jit_msgs__py
+[ 84%] Building C object CMakeFiles/jit_msgs__rosidl_generator_py.dir/rosidl_generator_py/jit_msgs/msg/_health_s.c.o
+[ 84%] Building C object CMakeFiles/jit_msgs__rosidl_generator_py.dir/rosidl_generator_py/jit_msgs/msg/_mode_s.c.o
+[ 85%] Building C object CMakeFiles/jit_msgs__rosidl_generator_py.dir/rosidl_generator_py/jit_msgs/msg/_estop_status_s.c.o
+[ 89%] Building C object CMakeFiles/jit_msgs__rosidl_generator_py.dir/rosidl_generator_py/jit_msgs/msg/_led_command_s.c.o
+[ 89%] Building C object CMakeFiles/jit_msgs__rosidl_generator_py.dir/rosidl_generator_py/jit_msgs/msg/_mode_request_s.c.o
+[ 90%] Linking C shared library rosidl_generator_py/jit_msgs/libjit_msgs__rosidl_generator_py.so
+[ 90%] Built target jit_msgs__rosidl_generator_py
+[ 92%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/rosidl_generator_py/jit_msgs/_jit_msgs_s.ep.rosidl_typesupport_fastrtps_c.c.o
+[ 95%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_introspection_c__pyext.dir/rosidl_generator_py/jit_msgs/_jit_msgs_s.ep.rosidl_typesupport_introspection_c.c.o
+[ 95%] Building C object CMakeFiles/jit_msgs__rosidl_typesupport_c__pyext.dir/rosidl_generator_py/jit_msgs/_jit_msgs_s.ep.rosidl_typesupport_c.c.o
+[ 96%] Linking C shared library rosidl_generator_py/jit_msgs/jit_msgs_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so
+[ 98%] Linking C shared library rosidl_generator_py/jit_msgs/jit_msgs_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so
+[100%] Linking C shared library rosidl_generator_py/jit_msgs/jit_msgs_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so
+[100%] Built target jit_msgs__rosidl_typesupport_c__pyext
+[100%] Built target jit_msgs__rosidl_typesupport_introspection_c__pyext
+[100%] Built target jit_msgs__rosidl_typesupport_fastrtps_c__pyext
+-- Install configuration: ""
+-- Execute custom install script
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/ament_index/resource_index/rosidl_interfaces/jit_msgs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__functions.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__struct.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__type_support.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__functions.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__struct.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__type_support.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__functions.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__struct.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__type_support.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__functions.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__struct.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__type_support.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__functions.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__struct.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__type_support.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/estop_status.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/health.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/led_command.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/mode.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/mode_request.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/rosidl_generator_c__visibility_control.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/library_path.sh
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/library_path.dsv
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__rosidl_typesupport_fastrtps_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__rosidl_typesupport_fastrtps_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__rosidl_typesupport_fastrtps_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__rosidl_typesupport_fastrtps_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__rosidl_typesupport_fastrtps_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/rosidl_typesupport_fastrtps_c__visibility_control.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__builder.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__struct.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__traits.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__type_support.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__builder.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__struct.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__traits.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__type_support.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__builder.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__struct.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__traits.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__type_support.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__builder.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__struct.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__traits.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__type_support.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__builder.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__struct.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__traits.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__type_support.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/estop_status.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/health.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/led_command.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/mode.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/mode_request.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/rosidl_generator_cpp__visibility_control.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__rosidl_typesupport_fastrtps_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__rosidl_typesupport_fastrtps_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__rosidl_typesupport_fastrtps_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__rosidl_typesupport_fastrtps_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__rosidl_typesupport_fastrtps_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/rosidl_typesupport_fastrtps_cpp__visibility_control.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__rosidl_typesupport_introspection_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__rosidl_typesupport_introspection_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__rosidl_typesupport_introspection_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__rosidl_typesupport_introspection_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__rosidl_typesupport_introspection_c.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/rosidl_typesupport_introspection_c__visibility_control.h
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/estop_status__rosidl_typesupport_introspection_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/health__rosidl_typesupport_introspection_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/led_command__rosidl_typesupport_introspection_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode__rosidl_typesupport_introspection_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/include/jit_msgs/jit_msgs/msg/detail/mode_request__rosidl_typesupport_introspection_cpp.hpp
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/pythonpath.sh
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/pythonpath.dsv
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs-0.1.0-py3.10.egg-info/PKG-INFO
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs-0.1.0-py3.10.egg-info/SOURCES.txt
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs-0.1.0-py3.10.egg-info/dependency_links.txt
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs-0.1.0-py3.10.egg-info/top_level.txt
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/__init__.py
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/_jit_msgs_s.ep.rosidl_typesupport_c.c
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/_jit_msgs_s.ep.rosidl_typesupport_fastrtps_c.c
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/_jit_msgs_s.ep.rosidl_typesupport_introspection_c.c
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/jit_msgs_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/jit_msgs_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/jit_msgs_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/libjit_msgs__rosidl_generator_py.so
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/__init__.py
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_estop_status.py
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_estop_status_s.c
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_health.py
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_health_s.c
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_led_command.py
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_led_command_s.c
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_mode.py
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_mode_request.py
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_mode_request_s.c
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_mode_s.c
+-- Up-to-date symlink: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/jit_msgs_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/jit_msgs_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/jit_msgs_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/rust/Cargo.toml
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/rust/build.rs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/rust/src/lib.rs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/rust/src/msg.rs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/rust/src/msg/rmw.rs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/Health.idl
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/Mode.idl
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/ModeRequest.idl
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/LedCommand.idl
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/EstopStatus.idl
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/Health.msg
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/Mode.msg
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/ModeRequest.msg
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/LedCommand.msg
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/msg/EstopStatus.msg
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/ament_index/resource_index/package_run_dependencies/jit_msgs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/ament_index/resource_index/parent_prefix_path/jit_msgs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/ament_prefix_path.sh
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/ament_prefix_path.dsv
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/path.sh
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/environment/path.dsv
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/local_setup.bash
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/local_setup.sh
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/local_setup.zsh
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/local_setup.dsv
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/package.dsv
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/ament_index/resource_index/packages/jit_msgs
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/rosidl_cmake-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/ament_cmake_export_include_directories-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/ament_cmake_export_libraries-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/ament_cmake_export_targets-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/rosidl_cmake_export_typesupport_targets-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/rosidl_cmake_aggregate_target-extras.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgsConfig.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgsConfig-version.cmake
+-- Symlinking: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/package.xml
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_generator_c.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_generator_c.so" to ""
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_fastrtps_c.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_fastrtps_c.so" to ""
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_fastrtps_cpp.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_fastrtps_cpp.so" to ""
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_introspection_c.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_introspection_c.so" to ""
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_c.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_c.so" to ""
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_introspection_cpp.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_introspection_cpp.so" to ""
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_cpp.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_typesupport_cpp.so" to ""
+Listing '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs'...
+Compiling '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/__init__.py'...
+Listing '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg'...
+Compiling '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/__init__.py'...
+Compiling '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_estop_status.py'...
+Compiling '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_health.py'...
+Compiling '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_led_command.py'...
+Compiling '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_mode.py'...
+Compiling '/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages/jit_msgs/msg/_mode_request.py'...
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_generator_py.so
+-- Set runtime path of "/home/zanslayer/SubmarineTest/install/jit_msgs/lib/libjit_msgs__rosidl_generator_py.so" to ""
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_generator_cExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_generator_cExport-noconfig.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_typesupport_fastrtps_cExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_typesupport_fastrtps_cExport-noconfig.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_generator_cppExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_typesupport_fastrtps_cppExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_typesupport_fastrtps_cppExport-noconfig.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_introspection_cExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_introspection_cExport-noconfig.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_cExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_cExport-noconfig.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_introspection_cppExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_introspection_cppExport-noconfig.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_cppExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/jit_msgs__rosidl_typesupport_cppExport-noconfig.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_generator_pyExport.cmake
+-- Installing: /home/zanslayer/SubmarineTest/install/jit_msgs/share/jit_msgs/cmake/export_jit_msgs__rosidl_generator_pyExport-noconfig.cmake

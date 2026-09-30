@@ -1,0 +1,4 @@
+[submodule "src/ping360_sonar"]
+	path = src/ping360_sonar
+	url = https://github.com/CentraleNantesRobotics/ping360_sonar.git
+	branch = ros2

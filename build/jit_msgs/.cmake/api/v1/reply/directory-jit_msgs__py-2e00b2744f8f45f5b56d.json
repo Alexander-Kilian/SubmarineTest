@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "jit_msgs__py",
+		"source" : "/home/zanslayer/SubmarineTest/build/jit_msgs/jit_msgs__py"
+	}
+}

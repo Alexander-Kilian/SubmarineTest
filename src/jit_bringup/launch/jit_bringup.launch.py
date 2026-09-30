@@ -40,12 +40,24 @@ normally: the panel is indication only and holds no safety policy.
 
 Set ``led_as_root:=false`` to start it as the current user instead.
 
+THE SONAR
+---------
+``ping360_node`` (upstream ping360_sonar, a git submodule) drives the Ping360
+over its USB serial adapter and publishes under ``sonar/``: ``scan_image``,
+``scan`` and ``scan_echo``. It is configured with ``fallback_emulated: false``,
+so a missing sonar makes the node exit and respawn with an error instead of
+quietly publishing emulated data. It holds no safety policy, so its failure
+never stops the launch.
+
+Set ``enable_sonar:=false`` to leave it out.
+
 Usage:
     ros2 launch jit_bringup jit_bringup.launch.py
     ros2 launch jit_bringup jit_bringup.launch.py enable_control:=false
     ros2 launch jit_bringup jit_bringup.launch.py boot_selftest:=false
     ros2 launch jit_bringup jit_bringup.launch.py params_file:=/path/to/my.yaml
     ros2 launch jit_bringup jit_bringup.launch.py led_as_root:=false
+    ros2 launch jit_bringup jit_bringup.launch.py enable_sonar:=false
 """
 
 import os
@@ -113,6 +125,11 @@ def generate_launch_description():
         "led_as_root",
         default_value="true",
         description="Start led_driver_node through sudo (asks for the password once).",
+    )
+    arg_sonar = DeclareLaunchArgument(
+        "enable_sonar",
+        default_value="true",
+        description="Start the Ping360 sonar driver.",
     )
     params = LaunchConfiguration("params_file")
     waypoints = LaunchConfiguration("waypoint_file")
@@ -187,6 +204,14 @@ def generate_launch_description():
 
     led_node = OpaqueFunction(function=led_driver)
 
+    # --- Sensors ------------------------------------------------------------
+    # Namespaced, so its jit_params.yaml key is /sonar/ping360_node.
+    sonar_node = node(
+        "ping360_sonar", "ping360_node", namespace="sonar",
+        respawn=True, respawn_delay=RESPAWN_DELAY_S,
+        condition=IfCondition(LaunchConfiguration("enable_sonar")),
+    )
+
     # --- Control stack ------------------------------------------------------
     vehicle_node = node(
         "jit_control", "vehicle_interface_node",
@@ -242,6 +267,7 @@ def generate_launch_description():
         arg_control,
         arg_selftest,
         arg_led_root,
+        arg_sonar,
         # First, so the sudo prompt comes before any node output.
         led_node,
         LogInfo(msg="[bringup] starting the JIT stack - health gate does the sequencing"),
@@ -253,4 +279,5 @@ def generate_launch_description():
         manual_node,
         local_node,
         global_node,
+        sonar_node,
     ])

@@ -1,0 +1,10 @@
+{
+  "package_name": "jit_msgs",
+  "non_idl_tuples": [
+    "/home/zanslayer/SubmarineTest/src/jit_msgs:msg/Health.msg",
+    "/home/zanslayer/SubmarineTest/src/jit_msgs:msg/Mode.msg",
+    "/home/zanslayer/SubmarineTest/src/jit_msgs:msg/ModeRequest.msg",
+    "/home/zanslayer/SubmarineTest/src/jit_msgs:msg/LedCommand.msg",
+    "/home/zanslayer/SubmarineTest/src/jit_msgs:msg/EstopStatus.msg"
+  ]
+}

@@ -1,4 +1,5 @@
-# Parameters for the JIT submarine stack, keyed by node name (no namespace).
+# Parameters for the JIT submarine stack, keyed by node name (no namespace -
+# except the sonar, see its section).
 #
 # Edit calibration values here as they are measured on the bench, then `git pull`
 # on the Pi - no rebuild is needed for a params-only change.
@@ -106,6 +107,53 @@ led_driver_node:
     # Wire colour order. WS2812B is almost always GRB; change if the panel
     # shows the wrong colour for a known pattern.
     strip_type: GRB
+
+# ===========================================================================
+# sensors
+# ===========================================================================
+
+# Upstream ping360_sonar (git submodule). The only node in the launch with a
+# namespace (topics land under sonar/), so this key is the FULLY QUALIFIED
+# node name - a bare "ping360_node:" would not match and every value below
+# would silently fall back to the upstream defaults (UDP, emulated sonar).
+/sonar/ping360_node:
+  ros__parameters:
+    # BlueRobotics BLU/USB serial adapter. Prefer the stable
+    # /dev/serial/by-id/usb-FTDI_... path once it is known on the Pi, so the
+    # sonar cannot swap names with another USB serial device.
+    connection_type: serial
+    device: /dev/ttyUSB0
+    baudrate: 115200
+    # Upstream default is true, which publishes RANDOM emulated data when the
+    # sonar cannot be opened. false = the node exits and respawns instead.
+    fallback_emulated: false
+    frame: sonar
+
+    # --- Transducer ---
+    gain: 0                     # 0 = low, 1 = normal, 2 = high
+    frequency: 740              # kHz [650..850]
+    speed_of_sound: 1500        # m/s [1450..1550]; ~1480 fresh water
+    # Integer metres [1..50]. Longer range = slower sweep. Unmeasured default -
+    # set it from the pool.
+    range_max: 10
+    angle_sector: 360           # degrees; below 360 the head oscillates
+    angle_step: 1               # degrees [1..20]
+    # Per-ping wait for the sonar's reply. The node blocks this long when the
+    # sonar stops answering, before warning "Cannot communicate with sonar".
+    sonar_timeout: 8000         # ms
+
+    # --- Outputs (all relative to sonar/) ---
+    # scan_image: sensor_msgs/Image (image_transport, so /compressed as well)
+    publish_image: true
+    image_size: 300             # pixels, even
+    image_rate: 100             # ms
+    # scan: sensor_msgs/LaserScan, nearest return >= scan_threshold, once per
+    # sweep. Only published while something is subscribed.
+    publish_scan: true
+    scan_threshold: 200         # [1..255]
+    # scan_echo: ping360_sonar_msgs/SonarEcho, raw intensities per angle.
+    # Only published while something is subscribed.
+    publish_echo: true
 
 # ===========================================================================
 # jit_control

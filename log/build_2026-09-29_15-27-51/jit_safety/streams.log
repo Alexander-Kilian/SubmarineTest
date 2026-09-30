@@ -1,0 +1,52 @@
+[0.039s] Invoking command in '/home/zanslayer/SubmarineTest/build/jit_safety': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/jit_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/jit_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/jit_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/zanslayer/SubmarineTest/src/jit_safety -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/zanslayer/SubmarineTest/install/jit_safety
+[0.115s] -- The C compiler identification is GNU 11.4.0
+[0.205s] -- The CXX compiler identification is GNU 11.4.0
+[0.217s] -- Detecting C compiler ABI info
+[0.303s] -- Detecting C compiler ABI info - done
+[0.313s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.313s] -- Detecting C compile features
+[0.314s] -- Detecting C compile features - done
+[0.320s] -- Detecting CXX compiler ABI info
+[0.433s] -- Detecting CXX compiler ABI info - done
+[0.443s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.444s] -- Detecting CXX compile features
+[0.445s] -- Detecting CXX compile features - done
+[0.452s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.627s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.712s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.738s] -- Found rclcpp: 16.0.21 (/opt/ros/humble/share/rclcpp/cmake)
+[0.800s] -- Found rosidl_generator_c: 3.1.9 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.805s] -- Found rosidl_adapter: 3.1.9 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.819s] -- Found rosidl_generator_cpp: 3.1.9 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.840s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.867s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.943s] -- Found rmw_implementation_cmake: 6.1.4 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.947s] -- Found rmw_fastrtps_cpp: 6.2.10 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[1.076s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.2")  
+[1.108s] -- Found FastRTPS: /opt/ros/humble/include  
+[1.159s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.172s] -- Looking for pthread.h
+[1.260s] -- Looking for pthread.h - found
+[1.260s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[1.359s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[1.360s] -- Found Threads: TRUE  
+[1.445s] CMake Error at CMakeLists.txt:19 (find_package):
+[1.445s]   By not providing "Findmavros_msgs.cmake" in CMAKE_MODULE_PATH this project
+[1.445s]   has asked CMake to find a package configuration file provided by
+[1.445s]   "mavros_msgs", but CMake did not find one.
+[1.445s] 
+[1.445s]   Could not find a package configuration file provided by "mavros_msgs" with
+[1.445s]   any of the following names:
+[1.445s] 
+[1.445s]     mavros_msgsConfig.cmake
+[1.445s]     mavros_msgs-config.cmake
+[1.445s] 
+[1.446s]   Add the installation prefix of "mavros_msgs" to CMAKE_PREFIX_PATH or set
+[1.446s]   "mavros_msgs_DIR" to a directory containing one of the above files.  If
+[1.446s]   "mavros_msgs" provides a separate development package or SDK, be sure it
+[1.446s]   has been installed.
+[1.446s] 
+[1.446s] 
+[1.446s] -- Configuring incomplete, errors occurred!
+[1.446s] See also "/home/zanslayer/SubmarineTest/build/jit_safety/CMakeFiles/CMakeOutput.log".
+[1.452s] Invoked command in '/home/zanslayer/SubmarineTest/build/jit_safety' returned '1': AMENT_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/jit_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/zanslayer/SubmarineTest/install/jit_msgs:/home/zanslayer/ros2_ws/install:/home/zanslayer/vrx_ws/install:/opt/ros/humble LD_LIBRARY_PATH=/home/zanslayer/SubmarineTest/install/jit_msgs/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/zanslayer/SubmarineTest/install/jit_msgs/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/zanslayer/SubmarineTest/src/jit_safety -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/zanslayer/SubmarineTest/install/jit_safety
