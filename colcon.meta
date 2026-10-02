@@ -1,0 +1,7 @@
+{
+  "names": {
+    "ping360_sonar": {
+      "cmake-args": ["-DCOMPILE_CPP=ON"]
+    }
+  }
+}
