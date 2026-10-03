@@ -118,15 +118,15 @@ public:
     rclcpp::QoS status_qos(1);
     status_qos.reliable();
     status_qos.transient_local();
-    status_pub_ = this->create_publisher<jit_msgs::msg::EstopStatus>("estop/status", status_qos);
+    status_pub_ = this->create_publisher<jit_msgs::msg::EstopStatus>("jit/estop/status", status_qos);
     publish_status();
 
     // --- The two permits ---
     permit_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      "crsf/relay_permit", 10,
+      "jit/crsf/relay_permit", 10,
       std::bind(&GpioEstopNode::permit_callback, this, std::placeholders::_1));
     health_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      "sys/health_ok", 10,
+      "jit/sys/health_ok", 10,
       std::bind(&GpioEstopNode::health_callback, this, std::placeholders::_1));
 
     // --- Timers ---
@@ -144,7 +144,7 @@ public:
       this->get_logger(),
       "Relay command = BCM%d (driven LOW at startup, rail CUT). Feedback = BCM%d "
       "(pull-down bias). Settle %d ms, watchdog %d ms per input. Waiting for "
-      "crsf/relay_permit AND sys/health_ok.",
+      "jit/crsf/relay_permit AND jit/sys/health_ok.",
       cmd_offset_, fb_offset_, relay_settle_ms_, watchdog_timeout_ms_);
   }
 
@@ -261,7 +261,7 @@ private:
   {
     if (have_permit_ && msg->data != permit_value_) {
       RCLCPP_INFO(
-        this->get_logger(), "crsf/relay_permit -> %s.", msg->data ? "true" : "false");
+        this->get_logger(), "jit/crsf/relay_permit -> %s.", msg->data ? "true" : "false");
     }
     have_permit_ = true;
     permit_value_ = msg->data;
@@ -272,7 +272,7 @@ private:
   {
     if (have_health_ && msg->data != health_value_) {
       RCLCPP_INFO(
-        this->get_logger(), "sys/health_ok -> %s.", msg->data ? "true" : "false");
+        this->get_logger(), "jit/sys/health_ok -> %s.", msg->data ? "true" : "false");
     }
     have_health_ = true;
     health_value_ = msg->data;

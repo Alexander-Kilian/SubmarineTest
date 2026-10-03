@@ -30,10 +30,6 @@
 //   MID   (raw ~997)   -> MANUAL       : relay permit true
 //   UP    (raw ~1792)  -> LOCAL_GUIDED : relay permit true
 //
-// GLOBAL_GUIDED has no detent. It is reachable only by editing kDetentModes
-// below, which is deliberate: the GPS is not connected and that mode must not
-// be selectable by accident at the pool.
-//
 // WIRING NOTE: on the real vehicle the link to the ELRS receiver is ONE-WAY.
 // Only the receiver's TX line is wired to the Pi's UART RX (GPIO15); the Pi's
 // UART TX (GPIO14) is NOT connected (space constraints on the penetrator). The
@@ -183,17 +179,17 @@ public:
     submerged_stamp_ = t0;
 
     // --- Publishers ---
-    channels_pub_ = this->create_publisher<std_msgs::msg::UInt16MultiArray>("crsf/channels", 10);
-    link_ok_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/link_ok", 10);
-    permit_pub_ = this->create_publisher<std_msgs::msg::Bool>("crsf/relay_permit", 10);
-    mode_pub_ = this->create_publisher<jit_msgs::msg::ModeRequest>("mode/request", 10);
+    channels_pub_ = this->create_publisher<std_msgs::msg::UInt16MultiArray>("jit/crsf/channels", 10);
+    link_ok_pub_ = this->create_publisher<std_msgs::msg::Bool>("jit/crsf/link_ok", 10);
+    permit_pub_ = this->create_publisher<std_msgs::msg::Bool>("jit/crsf/relay_permit", 10);
+    mode_pub_ = this->create_publisher<jit_msgs::msg::ModeRequest>("jit/mode/request", 10);
 
     // --- Subscriptions ---
     // The only input this node has ever taken. It can relax the link-loss
     // failsafe but can never assert it - a permit this node would have withheld
     // for any other reason stays withheld. See suppression_active().
     submerged_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      "nav/local/submerged", 10,
+      "jit/nav/local/submerged", 10,
       [this](const std_msgs::msg::Bool::SharedPtr m) {
         submerged_ = m->data;
         submerged_stamp_ = this->now();
@@ -278,10 +274,7 @@ private:
     return "?";
   }
 
-  // The detent -> mode table. GLOBAL_GUIDED is deliberately absent: change the
-  // UP entry here and rebuild if you want to bench-test it. See the header.
-  //
-  // The values come from Mode.msg, which is the single definition of the mode
+  // The detent -> mode table. The values come from Mode.msg, which is the single definition of the mode
   // enum; ModeRequest carries one of them in its `mode` field.
   static uint8_t detent_mode(Detent d)
   {
@@ -400,7 +393,7 @@ private:
 
     const char * done = nullptr;
     if (!requested) {
-      done = "nav/local/submerged dropped or went stale";
+      done = "jit/nav/local/submerged dropped or went stale";
     } else if (link && link_fsm_ == LinkFsm::OK) {
       done = "link recovered and the FSM has caught up";
     } else if (link && detent == Detent::DOWN) {
@@ -679,7 +672,7 @@ private:
         RCLCPP_WARN(
           this->get_logger(),
           "Relay permit HELD by submerged suppression: link FSM = %s, switch = %s, and "
-          "nav/local/submerged says this is a dive.",
+          "jit/nav/local/submerged says this is a dive.",
           fsm_name(link_fsm_), detent_name(detent));
       } else if (permitted) {
         RCLCPP_INFO(

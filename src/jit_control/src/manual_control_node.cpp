@@ -139,20 +139,20 @@ public:
     channels_stamp_ = mode_stamp_ = ready_stamp_ = t0;
 
     cmd_pub_ = this->create_publisher<mavros_msgs::msg::ManualControl>(
-      "cmd/manual/manual_control", 10);
+      "jit/cmd/manual/manual_control", 10);
 
     rclcpp::QoS latched(1);
     latched.reliable();
     latched.transient_local();
 
     channels_sub_ = this->create_subscription<std_msgs::msg::UInt16MultiArray>(
-      "crsf/channels", 10,
+      "jit/crsf/channels", 10,
       std::bind(&ManualControlNode::channels_cb, this, std::placeholders::_1));
     mode_sub_ = this->create_subscription<Mode>(
       "jit/mode", latched,
       [this](const Mode::SharedPtr m) {granted_mode_ = m->mode; mode_stamp_ = this->now();});
     ready_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      "vehicle/ready", latched,
+      "jit/vehicle/ready", latched,
       [this](const std_msgs::msg::Bool::SharedPtr m) {ready_ = m->data;
         ready_stamp_ = this->now();});
 
@@ -164,7 +164,7 @@ public:
     RCLCPP_INFO(
       this->get_logger(),
       "manual_control_node up. fwd=CRSF index %d, yaw=CRSF index %d, %.0f Hz. Publishes "
-      "cmd/manual/manual_control only while jit/mode is MANUAL.",
+      "jit/cmd/manual/manual_control only while jit/mode is MANUAL.",
       fwd_cal_.index, yaw_cal_.index, send_rate_hz_);
   }
 
@@ -175,7 +175,7 @@ private:
     if (need < 0 || static_cast<int>(msg->data.size()) <= need) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 3000,
-        "crsf/channels has %zu entries but need index %d; ignoring.", msg->data.size(), need);
+        "jit/crsf/channels has %zu entries but need index %d; ignoring.", msg->data.size(), need);
       channels_valid_ = false;
       return;
     }
@@ -230,7 +230,7 @@ private:
     if (!axes_ok) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(), *this->get_clock(), 1000,
-        "crsf/channels stale - commanding x=0, r=0.");
+        "jit/crsf/channels stale - commanding x=0, r=0.");
     }
 
     if (slew_max_per_s_ > 0.0) {

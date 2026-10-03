@@ -7,6 +7,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -15,7 +16,9 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ModeRequest.msg"
   "msg/LedCommand.msg"
   "msg/EstopStatus.msg"
-  DEPENDENCIES builtin_interfaces
+  "msg/WaypointXY.msg"
+  "msg/MissionXY.msg"
+  DEPENDENCIES builtin_interfaces std_msgs
 )
 
 if(BUILD_TESTING)

@@ -113,10 +113,10 @@ led_driver_node:
 # ===========================================================================
 
 # Upstream ping360_sonar (git submodule). The only node in the launch with a
-# namespace (topics land under sonar/), so this key is the FULLY QUALIFIED
+# namespace (topics land under jit/sonar/), so this key is the FULLY QUALIFIED
 # node name - a bare "ping360_node:" would not match and every value below
 # would silently fall back to the upstream defaults (UDP, emulated sonar).
-/sonar/ping360_node:
+/jit/sonar/ping360_node:
   ros__parameters:
     # BlueRobotics BLU/USB serial adapter. Prefer the stable
     # /dev/serial/by-id/usb-FTDI_... path once it is known on the Pi, so the
@@ -142,7 +142,7 @@ led_driver_node:
     # sonar stops answering, before warning "Cannot communicate with sonar".
     sonar_timeout: 8000         # ms
 
-    # --- Outputs (all relative to sonar/) ---
+    # --- Outputs (all relative to jit/sonar/) ---
     # scan_image: sensor_msgs/Image (image_transport, so /compressed as well)
     publish_image: true
     image_size: 300             # pixels, even
@@ -231,7 +231,13 @@ manual_control_node:
 
 local_guided_node:
   ros__parameters:
-    # waypoint_file is set by the launch file - see config/waypoints.yaml.
+    # waypoint_file and waypoint_source are set by the launch file - see
+    # config/waypoints.yaml and the waypoint_source launch argument.
+    #
+    # The sub's local frame. Must match the frame_id MAVROS stamps on
+    # /mavros/local_position/pose; every setpoint is stamped with it, and a
+    # topic mission is only accepted in it.
+    local_frame: local_origin
     # Acceptance mirrors ArduPilot's verify_nav_wp(): touch the ball once, then
     # dwell. Distance is NOT re-checked during the dwell.
     #
@@ -268,7 +274,24 @@ local_guided_node:
     # so hold the last commanded heading instead of spinning.
     yaw_hold_radius_m: 0.5
 
-global_guided_node:
+# ===========================================================================
+# jit_comunication
+# ===========================================================================
+
+# Started only with waypoint_source:=topic.
+waypoint_listener_node:
   ros__parameters:
-    # Skeleton node. Publishes nav/global/status = IDLE and nothing else.
-    status_rate_hz: 10.0
+    # Frame the other vessel publishes jit/waypoints in, and the sub's local
+    # frame it is transformed into. The other vessel broadcasts
+    # input_frame -> local_frame on /tf_static.
+    input_frame: map
+    local_frame: local_origin
+    # Geofence. A list is rejected WHOLE if it has more than max_waypoints, or
+    # if any waypoint lies more than max_waypoint_distance_m (horizontal) from
+    # the sub's position when the list arrives.
+    max_waypoints: 50
+    max_waypoint_distance_m: 20.0
+    pose_timeout_s: 1.0
+    # A list is refused while local_guided_node reports RUNNING, and also while
+    # its status is older than this - an unknown state may be RUNNING.
+    nav_status_timeout_s: 1.0

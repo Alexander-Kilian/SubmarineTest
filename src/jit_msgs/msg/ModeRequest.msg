@@ -9,7 +9,7 @@
 
 builtin_interfaces/Time stamp
 uint8 mode      # values are Mode.msg's constants - Mode::SAFE, Mode::MANUAL,
-                # Mode::LOCAL_GUIDED, Mode::GLOBAL_GUIDED. They are deliberately
+                # Mode::LOCAL_GUIDED. They are deliberately
                 # NOT redeclared here: one definition, in Mode.msg.
 uint8 source    # reserved - see NOTE-2
 

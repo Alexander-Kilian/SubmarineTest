@@ -1,7 +1,7 @@
 // local_guided_node.cpp
 //
 // Waypoint tracking against the DVL-backed local pose, for ArduSub GUIDED mode.
-// Publishes cmd/local_guided/setpoint (geometry_msgs/PoseStamped), which
+// Publishes jit/cmd/local_guided/setpoint (geometry_msgs/PoseStamped), which
 // vehicle_interface_node forwards to /mavros/setpoint_position/local. This node
 // holds no MAVROS client and cannot arm anything.
 //
@@ -121,6 +121,30 @@
 // restarts at index 0. The operator's re-run gesture is therefore a single
 // switch cycle. This is intentional for single-waypoint testing; it does mean
 // that intervening mid-mission and returning walks the whole pattern.
+//
+// ---------------------------------------------------------------------------
+// WAYPOINT SOURCE: file OR topic
+// ---------------------------------------------------------------------------
+// waypoint_source picks where the mission comes from, once, at launch:
+//
+//   file   waypoint_file, as described above. Offsets from the datum, and the
+//          only source that may command a depth change.
+//   topic  jit/nav/local/mission (jit_msgs/MissionXY) from
+//          waypoint_listener_node, which received it from another vessel and
+//          transformed it into local_frame. These waypoints are ABSOLUTE x/y in
+//          local_frame, so the datum is not added to them.
+//
+// A topic mission CANNOT DIVE, by construction: MissionXY has no z field, so
+// every waypoint enters this node with has_z = false and z_offset_for() holds
+// entry_z for the whole run. A topic mission is surface-only, and therefore
+// never asserts nav/local/submerged by command.
+//
+// The latest mission is cached as it arrives but only takes effect at mode
+// entry, when it is copied into waypoints_. A mission arriving mid-run cannot
+// change the running one (the listener refuses to send one while this node
+// reports RUNNING anyway). A new list therefore always needs the operator's
+// switch cycle to start - another vessel can stage a mission but cannot start
+// one. Re-entry with no new list re-flies the last one, as the file does.
 
 #include <chrono>
 #include <cmath>
@@ -136,19 +160,21 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 
+#include "jit_msgs/msg/mission_xy.hpp"
 #include "jit_msgs/msg/mode.hpp"
 
 #include "yaml-cpp/yaml.h"
 
 using namespace std::chrono_literals;
 using Mode = jit_msgs::msg::Mode;
+using MissionXY = jit_msgs::msg::MissionXY;
 
 namespace
 {
 struct Waypoint
 {
-  double x {0.0};        // offset East from the datum, metres
-  double y {0.0};        // offset North from the datum, metres
+  double x {0.0};        // offset East from the datum, metres (topic: absolute East)
+  double y {0.0};        // offset North from the datum, metres (topic: absolute North)
   double z {0.0};        // offset Up from entry_z, metres (negative = deeper)
   bool has_z {false};    // false -> hold the depth of the previous leg
 };
@@ -166,7 +192,11 @@ public:
   LocalGuidedNode()
   : Node("local_guided_node")
   {
+    waypoint_source_ = this->declare_parameter<std::string>("waypoint_source", "file");
     waypoint_file_ = this->declare_parameter<std::string>("waypoint_file", "");
+    // The sub's local frame: MAVROS stamps local_position/pose with it, every
+    // setpoint is stamped with it, and a topic mission must arrive in it.
+    local_frame_ = this->declare_parameter<std::string>("local_frame", "local_origin");
     radius_m_ = this->declare_parameter<double>("radius_m", 0.3);
     dwell_s_ = this->declare_parameter<double>("dwell_s", 1.0);
     setpoint_rate_hz_ = this->declare_parameter<double>("setpoint_rate_hz", 10.0);
@@ -193,16 +223,30 @@ public:
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
     pose_stamp_ = mode_stamp_ = t0;
 
-    load_waypoints();
+    topic_source_ = (waypoint_source_ == "topic");
+    if (topic_source_) {
+      RCLCPP_INFO(
+        this->get_logger(),
+        "waypoint_source=topic: missions come from jit/nav/local/mission, surface-only. "
+        "waypoint_file is ignored.");
+    } else {
+      if (waypoint_source_ != "file") {
+        RCLCPP_ERROR(
+          this->get_logger(),
+          "Unknown waypoint_source '%s' (expected 'file' or 'topic'). Falling back to file.",
+          waypoint_source_.c_str());
+      }
+      load_waypoints();
+    }
 
     setpoint_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-      "cmd/local_guided/setpoint", 10);
-    status_pub_ = this->create_publisher<std_msgs::msg::String>("nav/local/status", 10);
+      "jit/cmd/local_guided/setpoint", 10);
+    status_pub_ = this->create_publisher<std_msgs::msg::String>("jit/nav/local/status", 10);
 
     // Publish-always: goes out every tick whatever the state, so that silence
     // on this topic means this process died rather than "not submerged". Both
     // consumers re-arm the RC failsafe on staleness. See the header.
-    submerged_pub_ = this->create_publisher<std_msgs::msg::Bool>("nav/local/submerged", 10);
+    submerged_pub_ = this->create_publisher<std_msgs::msg::Bool>("jit/nav/local/submerged", 10);
 
     rclcpp::QoS latched(1);
     latched.reliable();
@@ -224,6 +268,14 @@ public:
       "jit/mode", latched,
       [this](const Mode::SharedPtr m) {granted_mode_ = m->mode; mode_stamp_ = this->now();});
 
+    // Latched on both ends, so a mission published before this node (re)started
+    // still arrives.
+    if (topic_source_) {
+      mission_sub_ = this->create_subscription<MissionXY>(
+        "jit/nav/local/mission", latched,
+        std::bind(&LocalGuidedNode::mission_cb, this, std::placeholders::_1));
+    }
+
     timer_ = this->create_wall_timer(
       std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::duration<double>(1.0 / setpoint_rate_hz_)),
@@ -234,8 +286,8 @@ public:
       "local_guided_node up. %zu waypoint(s) from '%s'. Acceptance: %.2f m horizontal "
       "(plus %.2f m vertical on a depth-changing leg) then %.2f s dwell. Setpoints at "
       "%.0f Hz.",
-      waypoints_.size(), waypoint_file_.c_str(), radius_m_, depth_radius_m_, dwell_s_,
-      setpoint_rate_hz_);
+      waypoints_.size(), topic_source_ ? "jit/nav/local/mission" : waypoint_file_.c_str(),
+      radius_m_, depth_radius_m_, dwell_s_, setpoint_rate_hz_);
 
     if (max_submerged_s_ > 0.0) {
       RCLCPP_INFO(
@@ -328,6 +380,38 @@ private:
     }
   }
 
+  // ---- Topic mission -------------------------------------------------------
+  //
+  // Cache only. waypoints_ is replaced at mode entry, never here, so nothing
+  // that arrives mid-mission can change the mission being flown.
+  void mission_cb(const MissionXY::SharedPtr m)
+  {
+    if (m->header.frame_id != local_frame_) {
+      RCLCPP_ERROR(
+        this->get_logger(),
+        "Ignoring mission in frame '%s' - expected '%s'. Keeping the previous one.",
+        m->header.frame_id.c_str(), local_frame_.c_str());
+      return;
+    }
+    cached_mission_.clear();
+    for (const auto & w : m->waypoints) {
+      Waypoint wp;
+      wp.x = w.x;
+      wp.y = w.y;
+      // has_z stays false: MissionXY cannot carry a depth. See the header.
+      cached_mission_.push_back(wp);
+    }
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Topic mission cached: %zu waypoint(s) in %s. Takes effect at the next entry to "
+      "LOCAL_GUIDED.", cached_mission_.size(), local_frame_.c_str());
+    for (size_t i = 0; i < cached_mission_.size(); ++i) {
+      RCLCPP_INFO(
+        this->get_logger(), "  wp[%zu]  x=%+.2f  y=%+.2f  (absolute, entry depth)",
+        i, cached_mission_[i].x, cached_mission_[i].y);
+    }
+  }
+
   bool fresh(const rclcpp::Time & stamp, double max_age_s) const
   {
     if (stamp.nanoseconds() == 0) {
@@ -368,8 +452,15 @@ private:
   // ---- Mode transitions ----------------------------------------------------
   void on_mode_entry()
   {
+    // Snapshot: the topic mission in force for this whole run is the one cached
+    // at this instant.
+    if (topic_source_) {
+      waypoints_ = cached_mission_;
+    }
     if (waypoints_.empty()) {
-      set_state(State::ABORTED, "no waypoints loaded");
+      set_state(
+        State::ABORTED,
+        topic_source_ ? "no mission received on jit/nav/local/mission" : "no waypoints loaded");
       return;
     }
     if (!have_pose_ || !fresh(pose_stamp_, pose_timeout_s_)) {
@@ -426,9 +517,11 @@ private:
 
     geometry_msgs::msg::PoseStamped sp;
     sp.header.stamp = now;
-    sp.header.frame_id = "map";
-    sp.pose.position.x = datum_.x + wp.x;
-    sp.pose.position.y = datum_.y + wp.y;
+    sp.header.frame_id = local_frame_;
+    // A file waypoint is an offset from the datum; a topic waypoint is already
+    // absolute in local_frame. Depth is the same rule for both.
+    sp.pose.position.x = topic_source_ ? wp.x : datum_.x + wp.x;
+    sp.pose.position.y = topic_source_ ? wp.y : datum_.y + wp.y;
     // Sticky: a leg with no z of its own holds the last commanded depth, not
     // the entry depth. See z_offset_for().
     sp.pose.position.z = entry_z_ + z_offset_for(index_);
@@ -576,7 +669,7 @@ private:
         RCLCPP_ERROR(
           this->get_logger(),
           "SUBMERGED DEADMAN EXPIRED after %.1f s (limit %.1f s). Dropping "
-          "nav/local/submerged and aborting: the RC link-loss failsafe re-arms, and if "
+          "jit/nav/local/submerged and aborting: the RC link-loss failsafe re-arms, and if "
           "the link is still down the relay opens and the vehicle floats up.",
           held, max_submerged_s_);
         set_state(State::ABORTED, "submerged deadman expired");
@@ -661,7 +754,10 @@ private:
   }
 
   // --- Config ---
+  std::string waypoint_source_;
+  bool topic_source_ {false};
   std::string waypoint_file_;
+  std::string local_frame_;
   double radius_m_ {0.3};
   double dwell_s_ {1.0};
   double setpoint_rate_hz_ {10.0};
@@ -670,7 +766,8 @@ private:
   double depth_radius_m_ {0.3};
   double submerge_threshold_m_ {0.2};
   double max_submerged_s_ {120.0};
-  std::vector<Waypoint> waypoints_;
+  std::vector<Waypoint> waypoints_;      // the mission being flown
+  std::vector<Waypoint> cached_mission_; // topic source: latest, applied at entry
 
   // --- Inputs ---
   geometry_msgs::msg::PoseStamped pose_;
@@ -701,6 +798,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr submerged_pub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
   rclcpp::Subscription<Mode>::SharedPtr mode_sub_;
+  rclcpp::Subscription<MissionXY>::SharedPtr mission_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

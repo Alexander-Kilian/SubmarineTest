@@ -143,7 +143,7 @@ public:
     latched.transient_local();
 
     sub_ = this->create_subscription<jit_msgs::msg::LedCommand>(
-      "led/command", latched,
+      "jit/led/command", latched,
       std::bind(&LedDriverNode::led_cb, this, std::placeholders::_1));
 
     RCLCPP_INFO(

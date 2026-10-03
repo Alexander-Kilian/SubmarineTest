@@ -43,13 +43,29 @@ Set ``led_as_root:=false`` to start it as the current user instead.
 THE SONAR
 ---------
 ``ping360_node`` (upstream ping360_sonar, a git submodule) drives the Ping360
-over its USB serial adapter and publishes under ``sonar/``: ``scan_image``,
+over its USB serial adapter and publishes under ``jit/sonar/``: ``scan_image``,
 ``scan`` and ``scan_echo``. It is configured with ``fallback_emulated: false``,
 so a missing sonar makes the node exit and respawn with an error instead of
 quietly publishing emulated data. It holds no safety policy, so its failure
 never stops the launch.
 
 Set ``enable_sonar:=false`` to leave it out.
+
+TOPIC NAMES
+-----------
+Every topic the stack owns is ``jit/<name>``, so this vehicle can share a DDS
+domain with another without colliding with it. That is a naming convention,
+not access control. MAVROS keeps ``/mavros/*``, and ``/tf``, ``/tf_static`` and
+``/rosout`` stay global.
+
+WAYPOINT SOURCE
+---------------
+``waypoint_source:=file`` (default) flies ``waypoint_file`` as always.
+``waypoint_source:=topic`` also starts ``waypoint_listener_node``, which takes a
+``nav_msgs/Path`` on ``jit/waypoints`` from another vessel, transforms it into
+the sub's local frame and stages it for ``local_guided_node``. Topic missions
+are surface-only: the depth is never taken from the topic. Either way a mission
+only starts on entry to LOCAL_GUIDED.
 
 Usage:
     ros2 launch jit_bringup jit_bringup.launch.py
@@ -58,6 +74,7 @@ Usage:
     ros2 launch jit_bringup jit_bringup.launch.py params_file:=/path/to/my.yaml
     ros2 launch jit_bringup jit_bringup.launch.py led_as_root:=false
     ros2 launch jit_bringup jit_bringup.launch.py enable_sonar:=false
+    ros2 launch jit_bringup jit_bringup.launch.py waypoint_source:=topic
 """
 
 import os
@@ -73,7 +90,7 @@ from launch.actions import (
     OpaqueFunction,
     RegisterEventHandler,
 )
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, LaunchConfigurationEquals
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -110,6 +127,13 @@ def generate_launch_description():
         "waypoint_file",
         default_value=PathJoinSubstitution([pkg_share, "config", "waypoints.yaml"]),
         description="Mission file for local_guided_node. Plain YAML, not ROS params.",
+    )
+    arg_wp_source = DeclareLaunchArgument(
+        "waypoint_source",
+        default_value="file",
+        choices=["file", "topic"],
+        description="Mission source for local_guided_node: waypoint_file, or jit/waypoints "
+                    "from another vessel via waypoint_listener_node (surface-only).",
     )
     arg_control = DeclareLaunchArgument(
         "enable_control",
@@ -205,9 +229,9 @@ def generate_launch_description():
     led_node = OpaqueFunction(function=led_driver)
 
     # --- Sensors ------------------------------------------------------------
-    # Namespaced, so its jit_params.yaml key is /sonar/ping360_node.
+    # Namespaced, so its jit_params.yaml key is /jit/sonar/ping360_node.
     sonar_node = node(
-        "ping360_sonar", "ping360_node", namespace="sonar",
+        "ping360_sonar", "ping360_node", namespace="jit/sonar",
         respawn=True, respawn_delay=RESPAWN_DELAY_S,
         condition=IfCondition(LaunchConfiguration("enable_sonar")),
     )
@@ -223,12 +247,20 @@ def generate_launch_description():
     )
     local_node = node(
         "jit_control", "local_guided_node",
-        extra_params={"waypoint_file": waypoints},
+        extra_params={
+            "waypoint_file": waypoints,
+            "waypoint_source": LaunchConfiguration("waypoint_source"),
+        },
         respawn=True, respawn_delay=RESPAWN_DELAY_S, condition=control_on,
     )
-    global_node = node(
-        "jit_control", "global_guided_node",
-        respawn=True, respawn_delay=RESPAWN_DELAY_S, condition=control_on,
+
+    # --- Inter-vessel ---------------------------------------------------------
+    # Only with waypoint_source:=topic. Holds no safety policy and cannot move
+    # the vehicle: the worst it can do is fail to stage a mission.
+    listener_node = node(
+        "jit_comunication", "waypoint_listener_node",
+        respawn=True, respawn_delay=RESPAWN_DELAY_S,
+        condition=LaunchConfigurationEquals("waypoint_source", "topic"),
     )
 
     def on_estop_exit(event, context):
@@ -264,6 +296,7 @@ def generate_launch_description():
     return LaunchDescription([
         arg_params,
         arg_waypoints,
+        arg_wp_source,
         arg_control,
         arg_selftest,
         arg_led_root,
@@ -278,6 +311,6 @@ def generate_launch_description():
         vehicle_node,
         manual_node,
         local_node,
-        global_node,
+        listener_node,
         sonar_node,
     ])

@@ -118,7 +118,6 @@ const char * mode_name(uint8_t m)
     case Mode::SAFE: return "SAFE";
     case Mode::MANUAL: return "MANUAL";
     case Mode::LOCAL_GUIDED: return "LOCAL_GUIDED";
-    case Mode::GLOBAL_GUIDED: return "GLOBAL_GUIDED";
     default: return "?";
   }
 }
@@ -198,20 +197,20 @@ public:
 
     health_pub_ = this->create_publisher<Health>("jit/health", latched);
     mode_pub_ = this->create_publisher<Mode>("jit/mode", latched);
-    safety_pub_ = this->create_publisher<std_msgs::msg::Bool>("sys/health_ok", 10);
-    led_pub_ = this->create_publisher<jit_msgs::msg::LedCommand>("led/command", latched);
+    safety_pub_ = this->create_publisher<std_msgs::msg::Bool>("jit/sys/health_ok", 10);
+    led_pub_ = this->create_publisher<jit_msgs::msg::LedCommand>("jit/led/command", latched);
 
     // --- Subscriptions ---
     link_ok_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      "crsf/link_ok", 10,
+      "jit/crsf/link_ok", 10,
       std::bind(&SystemMonitorNode::link_ok_cb, this, std::placeholders::_1), sub_opts);
 
     mode_req_sub_ = this->create_subscription<ModeRequest>(
-      "mode/request", 10,
+      "jit/mode/request", 10,
       std::bind(&SystemMonitorNode::mode_request_cb, this, std::placeholders::_1), sub_opts);
 
     estop_sub_ = this->create_subscription<jit_msgs::msg::EstopStatus>(
-      "estop/status", latched,
+      "jit/estop/status", latched,
       std::bind(&SystemMonitorNode::estop_cb, this, std::placeholders::_1), sub_opts);
 
     state_sub_ = this->create_subscription<mavros_msgs::msg::State>(
@@ -219,17 +218,13 @@ public:
       std::bind(&SystemMonitorNode::state_cb, this, std::placeholders::_1), sub_opts);
 
     nav_local_sub_ = this->create_subscription<std_msgs::msg::String>(
-      "nav/local/status", 10,
+      "jit/nav/local/status", 10,
       [this](const std_msgs::msg::String::SharedPtr m) {nav_local_ = m->data;}, sub_opts);
-
-    nav_global_sub_ = this->create_subscription<std_msgs::msg::String>(
-      "nav/global/status", 10,
-      [this](const std_msgs::msg::String::SharedPtr m) {nav_global_ = m->data;}, sub_opts);
 
     // Published every tick by local_guided_node whatever its state, so silence
     // here means that process died - and an absent flag suppresses nothing.
     submerged_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-      "nav/local/submerged", 10,
+      "jit/nav/local/submerged", 10,
       [this](const std_msgs::msg::Bool::SharedPtr m) {
         submerged_ = m->data;
         submerged_stamp_ = this->now();
@@ -298,13 +293,12 @@ private:
   }
 
   // Which nav status topic matters right now. An inactive source is ignored
-  // entirely - global_guided_node publishes IDLE forever and must not be able
-  // to affect anything.
+  // entirely, so a stale status from a mode we have left cannot affect
+  // anything.
   const std::string * active_nav_status() const
   {
     switch (granted_mode_) {
       case Mode::LOCAL_GUIDED: return &nav_local_;
-      case Mode::GLOBAL_GUIDED: return &nav_global_;
       default: return nullptr;
     }
   }
@@ -494,7 +488,7 @@ private:
       pattern = jit_msgs::msg::LedCommand::ESTOP;
     } else if (granted_mode_ == Mode::MANUAL) {
       pattern = jit_msgs::msg::LedCommand::MANUAL;
-    } else if (granted_mode_ == Mode::LOCAL_GUIDED || granted_mode_ == Mode::GLOBAL_GUIDED) {
+    } else if (granted_mode_ == Mode::LOCAL_GUIDED) {
       pattern = jit_msgs::msg::LedCommand::AUTO;
     } else {
       pattern = jit_msgs::msg::LedCommand::ESTOP;
@@ -564,7 +558,6 @@ private:
   rclcpp::Time mavros_stamp_;
 
   std::string nav_local_ {"IDLE"};
-  std::string nav_global_ {"IDLE"};
 
   bool submerged_ {false};
   rclcpp::Time submerged_stamp_;
@@ -591,7 +584,6 @@ private:
   rclcpp::Subscription<jit_msgs::msg::EstopStatus>::SharedPtr estop_sub_;
   rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_local_sub_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_global_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr submerged_sub_;
   rclcpp::TimerBase::SharedPtr evaluate_timer_;
   rclcpp::TimerBase::SharedPtr safety_timer_;

@@ -138,7 +138,7 @@ public:
 
     const auto t0 = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
     health_stamp_ = mode_stamp_ = mavros_stamp_ = t0;
-    manual_stamp_ = local_stamp_ = global_stamp_ = t0;
+    manual_stamp_ = local_stamp_ = t0;
     last_arm_call_ = last_mode_call_ = t0;
     last_sp_send_ = t0;
 
@@ -151,7 +151,7 @@ public:
     rclcpp::QoS latched(1);
     latched.reliable();
     latched.transient_local();
-    ready_pub_ = this->create_publisher<std_msgs::msg::Bool>("vehicle/ready", latched);
+    ready_pub_ = this->create_publisher<std_msgs::msg::Bool>("jit/vehicle/ready", latched);
 
     // --- Bus ---
     health_sub_ = this->create_subscription<Health>(
@@ -165,25 +165,18 @@ public:
 
     // --- Command sources ---
     manual_sub_ = this->create_subscription<mavros_msgs::msg::ManualControl>(
-      "cmd/manual/manual_control", 10,
+      "jit/cmd/manual/manual_control", 10,
       [this](const mavros_msgs::msg::ManualControl::SharedPtr m) {
         if (!accept_from(Mode::MANUAL, "manual")) {return;}
         manual_cmd_ = *m;
         manual_stamp_ = this->now();
       });
     local_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-      "cmd/local_guided/setpoint", 10,
+      "jit/cmd/local_guided/setpoint", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr m) {
         if (!accept_from(Mode::LOCAL_GUIDED, "local_guided")) {return;}
         local_cmd_ = *m;
         local_stamp_ = this->now();
-      });
-    global_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-      "cmd/global_guided/setpoint", 10,
-      [this](const geometry_msgs::msg::PoseStamped::SharedPtr m) {
-        if (!accept_from(Mode::GLOBAL_GUIDED, "global_guided")) {return;}
-        global_cmd_ = *m;
-        global_stamp_ = this->now();
       });
 
     state_sub_ = this->create_subscription<mavros_msgs::msg::State>(
@@ -418,8 +411,7 @@ private:
   {
     switch (granted) {
       case Mode::MANUAL: return manual_ardusub_mode_;
-      case Mode::LOCAL_GUIDED:
-      case Mode::GLOBAL_GUIDED: return guided_ardusub_mode_;
+      case Mode::LOCAL_GUIDED: return guided_ardusub_mode_;
       default: return safing_mode_;
     }
   }
@@ -430,7 +422,6 @@ private:
     switch (granted_mode_) {
       case Mode::MANUAL: return fresh(manual_stamp_, cmd_timeout_s_);
       case Mode::LOCAL_GUIDED: return fresh(local_stamp_, cmd_timeout_s_);
-      case Mode::GLOBAL_GUIDED: return fresh(global_stamp_, cmd_timeout_s_);
       default: return false;
     }
   }
@@ -504,7 +495,7 @@ private:
       return;
     }
 
-    auto sp = (granted_mode_ == Mode::LOCAL_GUIDED) ? local_cmd_ : global_cmd_;
+    auto sp = local_cmd_;
 
     if (setpoint_is_new(sp)) {
       sp_burst_remaining_ = std::max(1, setpoint_burst_count_);
@@ -633,8 +624,6 @@ private:
   rclcpp::Time manual_stamp_;
   geometry_msgs::msg::PoseStamped local_cmd_;
   rclcpp::Time local_stamp_;
-  geometry_msgs::msg::PoseStamped global_cmd_;
-  rclcpp::Time global_stamp_;
 
   // --- MAVROS state ---
   bool have_state_ {false};
@@ -669,7 +658,6 @@ private:
   rclcpp::Subscription<Mode>::SharedPtr mode_sub_;
   rclcpp::Subscription<mavros_msgs::msg::ManualControl>::SharedPtr manual_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr local_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr global_sub_;
   rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
   rclcpp::Client<mavros_msgs::srv::CommandBool>::SharedPtr arming_client_;
   rclcpp::Client<mavros_msgs::srv::SetMode>::SharedPtr set_mode_client_;

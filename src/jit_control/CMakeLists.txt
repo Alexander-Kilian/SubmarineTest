@@ -14,7 +14,6 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
 find_package(mavros_msgs REQUIRED)
 find_package(jit_msgs REQUIRED)
 
@@ -38,15 +37,10 @@ else()
   target_link_libraries(local_guided_node ${YAML_CPP_LIBRARIES})
 endif()
 
-add_executable(global_guided_node src/global_guided_node.cpp)
-ament_target_dependencies(global_guided_node
-  rclcpp std_msgs geometry_msgs sensor_msgs jit_msgs)
-
 install(TARGETS
   vehicle_interface_node
   manual_control_node
   local_guided_node
-  global_guided_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
